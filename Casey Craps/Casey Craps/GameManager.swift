@@ -63,15 +63,56 @@ class GameManager: ObservableObject {
     // MARK: - Private Helpers
 
     private func handleComeOutRoll(total: Int) {
+        guard let bet = player.currentBet else { return }
+
+        switch bet.type {
+        case .pass:
+            handlePassComeOut(total: total)
+        case .dontPass:
+            handleDontPassComeOut(total: total)
+        }
+    }
+
+    private func handlePassComeOut(total: Int) {
         switch total {
         case 7, 11:
-            // Natural - player wins
+            // Natural - Pass wins
+            print("Come-out \(total): Natural! Pass Line wins")
+            player.winBet()
             state = .resolved(won: true)
         case 2, 3, 12:
-            // Craps - player loses
+            // Craps - Pass loses
+            print("Come-out \(total): Craps! Pass Line loses")
+            player.loseBet()
             state = .resolved(won: false)
         default:
-            // Point established
+            // Point established (4, 5, 6, 8, 9, 10)
+            print("Come-out \(total): Point established")
+            pointValue = total
+            state = .point(total)
+        }
+    }
+
+    private func handleDontPassComeOut(total: Int) {
+        switch total {
+        case 7, 11:
+            // Natural - Don't Pass loses
+            print("Come-out \(total): Natural! Don't Pass loses")
+            player.loseBet()
+            state = .resolved(won: false)
+        case 2, 3:
+            // Craps - Don't Pass wins
+            print("Come-out \(total): Craps! Don't Pass wins")
+            player.winBet()
+            state = .resolved(won: true)
+        case 12:
+            // Bar 12 - Push
+            print("Come-out \(total): Bar 12! Push")
+            player.pushBet()
+            state = .resolved(won: false)
+        default:
+            // Point established (4, 5, 6, 8, 9, 10)
+            print("Come-out \(total): Point established")
             pointValue = total
             state = .point(total)
         }

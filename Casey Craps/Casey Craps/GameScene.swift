@@ -122,12 +122,53 @@ class GameScene: SKScene {
                 if completedDice == 2 {
                     self.isRolling = false
                     print("Rolled: \(finalValue1) and \(finalValue2) = \(total)")
+
+                    // Process roll through GameManager
+                    self.gameManager.roll(die1: finalValue1, die2: finalValue2)
+
+                    // Handle outcome based on new state
+                    self.handleRollOutcome()
                 }
             }
 
             // Animate both dice
             die1.roll(to: finalValue1, completion: diceCompletion)
             die2.roll(to: finalValue2, completion: diceCompletion)
+        }
+    }
+
+    private func handleRollOutcome() {
+        switch gameManager.state {
+        case .resolved(let won):
+            if won {
+                print("WIN! Bankroll updated")
+            } else {
+                print("LOSE! Bankroll updated")
+            }
+            // Update bankroll display
+            updateBankrollDisplay()
+
+            // Remove bet chip
+            betChip?.removeFromParent()
+            betChip = nil
+
+            // Disable roll button
+            rollButton.fontColor = .gray
+
+            // Reset game after short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                self.gameManager.reset()
+                self.crapsTable?.setPuckPosition(point: nil)
+            }
+
+        case .point(let pointValue):
+            print("Point is \(pointValue)")
+            // Update puck to show ON at the point number
+            crapsTable?.setPuckPosition(point: pointValue)
+            // Bet chip stays on table for point phase
+
+        default:
+            break
         }
     }
 
