@@ -6,7 +6,7 @@ Build a learn-by-playing craps game for macOS. Start with clean architecture, ad
 
 ## Phases
 
-- [ ] **Phase 1: Foundation** - Clean game architecture replacing template code
+- [x] **Phase 1: Foundation** - Clean game architecture replacing template code
 - [ ] **Phase 2: Table & Dice** - Realistic table layout and physics-based dice
 - [ ] **Phase 3: Game Logic** - Pass line betting with come-out and point phases
 - [ ] **Phase 4: Audio** - Synthesized sounds for all game events
@@ -20,8 +20,8 @@ Build a learn-by-playing craps game for macOS. Start with clean architecture, ad
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: GameManager singleton and game state enum
-- [ ] 01-02: Scene setup with proper coordinate system and scaling
+- [x] 01-01: GameManager singleton and game state enum
+- [x] 01-02: Scene setup with proper coordinate system and scaling
 
 ### Phase 2: Table & Dice
 **Goal**: Visual craps table and satisfying dice rolling
@@ -64,7 +64,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/2 | Not started | - |
+| 1. Foundation | 2/2 | Complete | 2025-12-24 |
 | 2. Table & Dice | 0/2 | Not started | - |
 | 3. Game Logic | 0/3 | Not started | - |
 | 4. Audio | 0/2 | Not started | - |
