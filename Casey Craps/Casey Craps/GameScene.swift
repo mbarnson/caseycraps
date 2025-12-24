@@ -12,6 +12,9 @@ class GameScene: SKScene {
 
     private let gameManager = GameManager.shared
     private var crapsTable: CrapsTableNode?
+    private var die1: DieNode!
+    private var die2: DieNode!
+    private var isRolling: Bool = false
 
     override func didMove(to view: SKView) {
         // Remove template nodes from .sks file
@@ -29,6 +32,15 @@ class GameScene: SKScene {
         addChild(table)
         crapsTable = table
 
+        // Add dice to shooter area (right side of table)
+        die1 = DieNode()
+        die1.position = CGPoint(x: 250, y: 50)
+        addChild(die1)
+
+        die2 = DieNode()
+        die2.position = CGPoint(x: 350, y: 50)
+        addChild(die2)
+
         // Add Roll Dice button below the table
         let rollButton = SKLabelNode(text: "Roll Dice")
         rollButton.fontSize = 36
@@ -43,9 +55,28 @@ class GameScene: SKScene {
         let node = atPoint(location)
 
         if node.name == "rollButton" {
-            let die1 = Die.roll()
-            let die2 = Die.roll()
-            print("Rolled: \(die1) and \(die2) = \(die1 + die2)")
+            // Prevent multiple simultaneous rolls
+            guard !isRolling else { return }
+            isRolling = true
+
+            // Get final dice values from the model
+            let finalValue1 = Die.roll()
+            let finalValue2 = Die.roll()
+            let total = finalValue1 + finalValue2
+
+            // Track completion of both dice
+            var completedDice = 0
+            let diceCompletion = {
+                completedDice += 1
+                if completedDice == 2 {
+                    self.isRolling = false
+                    print("Rolled: \(finalValue1) and \(finalValue2) = \(total)")
+                }
+            }
+
+            // Animate both dice
+            die1.roll(to: finalValue1, completion: diceCompletion)
+            die2.roll(to: finalValue2, completion: diceCompletion)
         }
     }
 
