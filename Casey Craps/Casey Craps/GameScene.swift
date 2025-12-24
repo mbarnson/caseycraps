@@ -15,6 +15,9 @@ class GameScene: SKScene {
     private var die1: DieNode!
     private var die2: DieNode!
     private var isRolling: Bool = false
+    private var bankrollLabel: SKLabelNode!
+    private var betChip: SKNode?
+    private var rollButton: SKLabelNode!
 
     override func didMove(to view: SKView) {
         // Remove template nodes from .sks file
@@ -42,19 +45,67 @@ class GameScene: SKScene {
         addChild(die2)
 
         // Add Roll Dice button below the table
-        let rollButton = SKLabelNode(text: "Roll Dice")
+        rollButton = SKLabelNode(text: "Roll Dice")
         rollButton.fontSize = 36
-        rollButton.fontColor = .white
+        rollButton.fontColor = .gray
         rollButton.name = "rollButton"
         rollButton.position = CGPoint(x: 0, y: -300)
         addChild(rollButton)
+
+        // Add bankroll display at top-left
+        bankrollLabel = SKLabelNode(text: "Bankroll: $1,000")
+        bankrollLabel.fontSize = 24
+        bankrollLabel.fontName = "Arial-BoldMT"
+        bankrollLabel.fontColor = .white
+        bankrollLabel.horizontalAlignmentMode = .left
+        bankrollLabel.position = CGPoint(x: -450, y: 280)
+        addChild(bankrollLabel)
+        updateBankrollDisplay()
+    }
+
+    private func updateBankrollDisplay() {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = ","
+        let formattedBankroll = formatter.string(from: NSNumber(value: gameManager.player.bankroll)) ?? "0"
+        bankrollLabel.text = "Bankroll: $\(formattedBankroll)"
     }
 
     override func mouseDown(with event: NSEvent) {
         let location = event.location(in: self)
         let node = atPoint(location)
 
+        // Handle betting area clicks
+        if (node.name == "passLineArea" || node.name == "dontPassArea") && gameManager.state == .waitingForBet {
+            let betType: BetType = node.name == "passLineArea" ? .pass : .dontPass
+            let betAmount = 100
+
+            // Place bet with player
+            if gameManager.player.placeBet(type: betType, amount: betAmount) {
+                // Create and display chip
+                createBetChip(at: node.position, amount: betAmount)
+
+                // Update bankroll display
+                updateBankrollDisplay()
+
+                // Transition game state
+                gameManager.placeBet()
+
+                // Enable roll button
+                rollButton.fontColor = .white
+            }
+        }
+
         if node.name == "rollButton" {
+            // Only allow rolling if bet is placed (state is comeOut or point)
+            let canRoll: Bool
+            if case .point = gameManager.state {
+                canRoll = true
+            } else {
+                canRoll = gameManager.state == .comeOut
+            }
+            guard canRoll else { return }
+
             // Prevent multiple simultaneous rolls
             guard !isRolling else { return }
             isRolling = true
@@ -78,6 +129,31 @@ class GameScene: SKScene {
             die1.roll(to: finalValue1, completion: diceCompletion)
             die2.roll(to: finalValue2, completion: diceCompletion)
         }
+    }
+
+    private func createBetChip(at position: CGPoint, amount: Int) {
+        // Remove existing chip if any
+        betChip?.removeFromParent()
+
+        // Create chip node
+        let chipRadius: CGFloat = 25
+        let chip = SKShapeNode(circleOfRadius: chipRadius)
+        chip.fillColor = SKColor(red: 0.8, green: 0.1, blue: 0.1, alpha: 1.0)
+        chip.strokeColor = .white
+        chip.lineWidth = 3
+        chip.position = position
+
+        // Add amount label
+        let label = SKLabelNode(text: "$\(amount)")
+        label.fontSize = 18
+        label.fontName = "Arial-BoldMT"
+        label.fontColor = .white
+        label.verticalAlignmentMode = .center
+        chip.addChild(label)
+
+        // Add to table
+        crapsTable?.addChild(chip)
+        betChip = chip
     }
 
     override func update(_ currentTime: TimeInterval) {

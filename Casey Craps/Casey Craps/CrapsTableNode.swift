@@ -62,6 +62,7 @@ class CrapsTableNode: SKNode {
         passLine.strokeColor = .white
         passLine.lineWidth = 3
         passLine.position = CGPoint(x: 0, y: passLineY)
+        passLine.name = "passLineArea"
         addChild(passLine)
 
         // Pass Line label
@@ -84,6 +85,7 @@ class CrapsTableNode: SKNode {
         dontPass.strokeColor = .yellow
         dontPass.lineWidth = 2
         dontPass.position = CGPoint(x: -tableWidth/2 + 170, y: dontPassY)
+        dontPass.name = "dontPassArea"
         addChild(dontPass)
 
         // Don't Pass Bar label

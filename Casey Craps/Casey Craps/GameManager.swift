@@ -26,6 +26,9 @@ class GameManager: ObservableObject {
     /// Current point value when in point phase
     @Published private(set) var pointValue: Int?
 
+    /// Player with bankroll and betting
+    let player = Player()
+
     private init() {}
 
     /// Place a bet and transition to come-out roll phase
