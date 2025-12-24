@@ -11,6 +11,7 @@ import GameplayKit
 class GameScene: SKScene {
 
     private let gameManager = GameManager.shared
+    private var crapsTable: CrapsTableNode?
 
     override func didMove(to view: SKView) {
         // Remove template nodes from .sks file
@@ -22,12 +23,18 @@ class GameScene: SKScene {
         // Print current game state
         print("Game State: \(gameManager.state)")
 
-        // Add Roll Dice button
+        // Add craps table
+        let table = CrapsTableNode()
+        table.position = CGPoint(x: 0, y: 0)
+        addChild(table)
+        crapsTable = table
+
+        // Add Roll Dice button below the table
         let rollButton = SKLabelNode(text: "Roll Dice")
-        rollButton.fontSize = 48
+        rollButton.fontSize = 36
         rollButton.fontColor = .white
         rollButton.name = "rollButton"
-        rollButton.position = CGPoint(x: 0, y: 0)
+        rollButton.position = CGPoint(x: 0, y: -300)
         addChild(rollButton)
     }
 
