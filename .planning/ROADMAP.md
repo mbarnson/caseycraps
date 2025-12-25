@@ -10,7 +10,7 @@ Build a learn-by-playing craps game for macOS. Start with clean architecture, ad
 - [x] **Phase 2: Table & Dice** - Realistic table layout and physics-based dice
 - [x] **Phase 3: Game Logic** - Pass line betting with come-out and point phases
 - [x] **Phase 4: Audio** - Synthesized sounds for all game events
-- [ ] **Phase 5: Polish** - HUD, bet UI, visual feedback, educational cues
+- [x] **Phase 5: Polish** - HUD, bet UI, visual feedback, educational cues, Place bets
 
 ## Phase Details
 
@@ -54,11 +54,12 @@ Plans:
 ### Phase 5: Polish
 **Goal**: Refined experience with teaching moments
 **Depends on**: Phase 4
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
-- [ ] 05-01: HUD (bankroll display, current bet, point marker, game state)
-- [ ] 05-02: Visual feedback and subtle educational hints
+- [x] 05-01: HUD (bankroll display, current bet, point marker, game state)
+- [x] 05-02: Visual feedback and subtle educational hints
+- [x] 05-03: Place bets on point numbers (bonus feature)
 
 ## Progress
 
@@ -68,4 +69,13 @@ Plans:
 | 2. Table & Dice | 2/2 | Complete | 2025-12-24 |
 | 3. Game Logic | 3/3 | Complete | 2025-12-24 |
 | 4. Audio | 2/2 | Complete | 2025-12-24 |
-| 5. Polish | 0/2 | Not started | - |
+| 5. Polish | 3/3 | Complete | 2025-12-25 |
+
+## v1.0 Complete
+
+Casey Craps is a fully functional craps game with:
+- Pass Line and Don't Pass betting
+- Place bets on point numbers with correct odds
+- Synthesized audio feedback
+- Educational hints and roll result callouts
+- Take-down functionality for Place bets

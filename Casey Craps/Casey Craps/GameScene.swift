@@ -20,8 +20,11 @@ class GameScene: SKScene {
     private var rollButton: SKLabelNode!
     private var outcomeLabel: SKLabelNode?
     private var gameStateBanner: SKLabelNode!
+    private var hintLabel: SKLabelNode!
+    private var rollResultLabel: SKLabelNode!
     private var selectedBetAmount: Int = 100
     private var betButtons: [SKNode] = []
+    private var placeChips: [Int: SKNode] = [:]  // Track chips on place bet numbers
 
     override func didMove(to view: SKView) {
         // Remove template nodes from .sks file
@@ -39,13 +42,13 @@ class GameScene: SKScene {
         addChild(table)
         crapsTable = table
 
-        // Add dice to shooter area (right side of table)
+        // Add dice to center of table (below point numbers, above pass line)
         die1 = DieNode()
-        die1.position = CGPoint(x: 250, y: 50)
+        die1.position = CGPoint(x: -50, y: 20)
         addChild(die1)
 
         die2 = DieNode()
-        die2.position = CGPoint(x: 350, y: 50)
+        die2.position = CGPoint(x: 50, y: 20)
         addChild(die2)
 
         // Add Roll Dice button below the table
@@ -53,16 +56,16 @@ class GameScene: SKScene {
         rollButton.fontSize = 36
         rollButton.fontColor = .gray
         rollButton.name = "rollButton"
-        rollButton.position = CGPoint(x: 0, y: -300)
+        rollButton.position = CGPoint(x: 0, y: -350)
         addChild(rollButton)
 
-        // Add bankroll display at top-left
+        // Add bankroll display at top-left (above the banner)
         bankrollLabel = SKLabelNode(text: "Bankroll: $1,000")
         bankrollLabel.fontSize = 24
         bankrollLabel.fontName = "Arial-BoldMT"
         bankrollLabel.fontColor = .white
         bankrollLabel.horizontalAlignmentMode = .left
-        bankrollLabel.position = CGPoint(x: -450, y: 280)
+        bankrollLabel.position = CGPoint(x: -450, y: 340)
         addChild(bankrollLabel)
         updateBankrollDisplay()
 
@@ -86,6 +89,27 @@ class GameScene: SKScene {
         addChild(gameStateBanner)
 
         updateGameStateBanner()
+
+        // Add hint label below game state banner (with more spacing)
+        hintLabel = SKLabelNode(text: "")
+        hintLabel.fontSize = 20
+        hintLabel.fontName = "Arial"
+        hintLabel.fontColor = SKColor(white: 0.8, alpha: 1.0)
+        hintLabel.verticalAlignmentMode = .center
+        hintLabel.position = CGPoint(x: 0, y: 205)
+        hintLabel.zPosition = 10
+        addChild(hintLabel)
+        updateHintLabel()
+
+        // Add roll result label (initially hidden)
+        rollResultLabel = SKLabelNode(text: "")
+        rollResultLabel.fontSize = 66
+        rollResultLabel.fontName = "Arial-BoldMT"
+        rollResultLabel.verticalAlignmentMode = .center
+        rollResultLabel.position = CGPoint(x: 0, y: 0)
+        rollResultLabel.zPosition = 101
+        rollResultLabel.alpha = 0
+        addChild(rollResultLabel)
 
         // Add bet amount controls
         createBetAmountButtons()
@@ -127,6 +151,32 @@ class GameScene: SKScene {
                     gameStateBanner.fontColor = .red
                 }
             }
+        }
+    }
+
+    private func updateHintLabel() {
+        let betType = gameManager.player.currentBet?.type ?? .pass
+
+        switch gameManager.state {
+        case .waitingForBet:
+            hintLabel.text = "Click PASS LINE or DON'T PASS to place your bet"
+
+        case .comeOut:
+            if betType == .pass {
+                hintLabel.text = "7 or 11 WINS! • 2, 3, 12 loses • Other numbers set the point"
+            } else {
+                hintLabel.text = "2 or 3 WINS! • 7, 11 loses • 12 pushes • Other sets point"
+            }
+
+        case .point(let value):
+            if betType == .pass {
+                hintLabel.text = "Roll \(value) to WIN! • 7 loses • Click numbers to place bets"
+            } else {
+                hintLabel.text = "7 WINS! • \(value) loses • Click numbers to place bets"
+            }
+
+        case .resolved:
+            hintLabel.text = ""
         }
     }
 
@@ -229,6 +279,15 @@ class GameScene: SKScene {
             return
         }
 
+        // Handle Place bet clicks on point numbers during point phase
+        if let nodeName = node.name, nodeName.starts(with: "placeNumber") {
+            if let numberString = nodeName.dropFirst("placeNumber".count).description as String?,
+               let number = Int(numberString) {
+                handlePlaceBetClick(on: number)
+            }
+            return
+        }
+
         // Handle betting area clicks
         if (node.name == "passLineArea" || node.name == "dontPassArea") && gameManager.state == .waitingForBet {
             let betType: BetType = node.name == "passLineArea" ? .pass : .dontPass
@@ -250,6 +309,9 @@ class GameScene: SKScene {
 
                 // Update game state banner
                 updateGameStateBanner()
+
+                // Update hint label
+                updateHintLabel()
 
                 // Update bet button states (hide them after bet placed)
                 updateBetButtonStates()
@@ -292,8 +354,14 @@ class GameScene: SKScene {
                     // Process roll through GameManager
                     self.gameManager.roll(die1: finalValue1, die2: finalValue2)
 
+                    // Show roll result callout
+                    self.showRollResult(total: total)
+
                     // Update game state banner
                     self.updateGameStateBanner()
+
+                    // Update hint label
+                    self.updateHintLabel()
 
                     // Handle outcome based on new state
                     self.handleRollOutcome()
@@ -307,8 +375,26 @@ class GameScene: SKScene {
     }
 
     private func handleRollOutcome() {
+        // Check for place bet winnings first
+        if gameManager.lastPlaceBetWinnings > 0, let winningNumber = gameManager.lastPlaceBetWinningNumber {
+            // Show place bet winnings
+            showPlaceBetWinnings(amount: gameManager.lastPlaceBetWinnings, on: winningNumber)
+
+            // Remove the winning chip
+            removePlaceChip(from: winningNumber)
+
+            // Play win sound for place bet
+            SoundManager.shared.playWinSound()
+
+            // Update bankroll display
+            updateBankrollDisplay()
+        }
+
         switch gameManager.state {
         case .resolved(let won):
+            // All place bets lose on seven out - remove chips
+            removeAllPlaceChips()
+
             // Show outcome feedback
             showOutcomeLabel(won: won)
 
@@ -341,6 +427,9 @@ class GameScene: SKScene {
                 // Update game state banner
                 self.updateGameStateBanner()
 
+                // Update hint label
+                self.updateHintLabel()
+
                 // Update bet button states (show them again)
                 self.updateBetButtonStates()
             }
@@ -357,6 +446,28 @@ class GameScene: SKScene {
         default:
             break
         }
+    }
+
+    private func showPlaceBetWinnings(amount: Int, on number: Int) {
+        // Get position of the number box
+        guard let position = crapsTable?.getPointBoxPosition(number: number) else { return }
+
+        // Create floating winnings label
+        let winLabel = SKLabelNode(text: "+$\(amount)")
+        winLabel.fontSize = 28
+        winLabel.fontName = "Arial-BoldMT"
+        winLabel.fontColor = .green
+        winLabel.position = CGPoint(x: position.x, y: position.y - 40)
+        winLabel.zPosition = 200
+        crapsTable?.addChild(winLabel)
+
+        // Animate floating up and fading out
+        let moveUp = SKAction.moveBy(x: 0, y: 60, duration: 1.0)
+        let fadeOut = SKAction.fadeOut(withDuration: 1.0)
+        let group = SKAction.group([moveUp, fadeOut])
+        let remove = SKAction.removeFromParent()
+        let sequence = SKAction.sequence([group, remove])
+        winLabel.run(sequence)
     }
 
     private func showOutcomeLabel(won: Bool) {
@@ -402,6 +513,73 @@ class GameScene: SKScene {
         label.run(SKAction.repeatForever(pulse))
     }
 
+    private func showRollResult(total: Int) {
+        // Determine color based on game state and bet type
+        let betType = gameManager.player.currentBet?.type ?? .pass
+        var color: SKColor
+        var isWinning = false
+        var isLosing = false
+
+        switch gameManager.state {
+        case .resolved(let won):
+            // Resolved state - show green for win, red for loss
+            if won {
+                color = .green
+                isWinning = true
+            } else {
+                color = .red
+                isLosing = true
+            }
+
+        case .point:
+            // Point was just set - neutral/informative (yellow)
+            color = .yellow
+
+        case .comeOut:
+            // Shouldn't happen, but default to white
+            color = .white
+
+        case .waitingForBet:
+            // Shouldn't happen
+            color = .white
+        }
+
+        // Set text and color
+        rollResultLabel.text = "\(total)!"
+        rollResultLabel.fontColor = color
+
+        // Remove any existing animations
+        rollResultLabel.removeAllActions()
+
+        // Animation sequence
+        rollResultLabel.alpha = 0
+        rollResultLabel.setScale(0)
+
+        let popIn = SKAction.group([
+            SKAction.fadeIn(withDuration: 0.2),
+            SKAction.sequence([
+                SKAction.scale(to: 1.2, duration: 0.15),
+                SKAction.scale(to: 1.0, duration: 0.1)
+            ])
+        ])
+
+        // Hold duration depends on outcome type
+        let holdDuration: TimeInterval
+        if isWinning || isLosing {
+            // Win/loss: hold for 1 second
+            holdDuration = 1.0
+        } else {
+            // Point set: fade faster (0.6 seconds)
+            holdDuration = 0.6
+        }
+
+        let wait = SKAction.wait(forDuration: holdDuration)
+        let fadeOut = SKAction.fadeOut(withDuration: 0.3)
+
+        let sequence = SKAction.sequence([popIn, wait, fadeOut])
+        rollResultLabel.run(sequence)
+    }
+
     private func createBetChip(at position: CGPoint, amount: Int) {
         // Remove existing chip if any
         betChip?.removeFromParent()
@@ -412,7 +590,8 @@ class GameScene: SKScene {
         chip.fillColor = SKColor(red: 0.8, green: 0.1, blue: 0.1, alpha: 1.0)
         chip.strokeColor = .white
         chip.lineWidth = 3
-        chip.position = position
+        // Offset chip to the right of center so it doesn't cover text
+        chip.position = CGPoint(x: position.x + 200, y: position.y)
 
         // Add amount label
         let label = SKLabelNode(text: "$\(amount)")
@@ -425,6 +604,102 @@ class GameScene: SKScene {
         // Add to table
         crapsTable?.addChild(chip)
         betChip = chip
+    }
+
+    // MARK: - Place Bets
+
+    private func handlePlaceBetClick(on number: Int) {
+        // Must be in point phase to interact with place bets
+        guard case .point = gameManager.state else {
+            print("Can only place/remove bets during point phase")
+            return
+        }
+
+        // Check if player already has a bet on this number - if so, take it down
+        if gameManager.player.hasPlaceBet(on: number) {
+            let returned = gameManager.player.takeDownPlaceBet(number: number)
+            if returned > 0 {
+                // Play chip click sound
+                SoundManager.shared.playChipClick()
+
+                // Remove the chip
+                removePlaceChip(from: number)
+
+                // Update bankroll display
+                updateBankrollDisplay()
+
+                print("Took down $\(returned) from \(number)")
+            }
+            return
+        }
+
+        // Otherwise, try to place a new bet
+        // Check if we can place a bet on this number (not the point)
+        guard gameManager.canPlaceBet(on: number) else {
+            print("Cannot place bet on \(number)")
+            return
+        }
+
+        // Check if player can afford the bet
+        guard gameManager.player.bankroll >= selectedBetAmount else {
+            print("Cannot afford place bet")
+            return
+        }
+
+        // Place the bet
+        if gameManager.player.placePlaceBet(number: number, amount: selectedBetAmount) {
+            // Play chip click sound
+            SoundManager.shared.playChipClick()
+
+            // Create and display chip on the number
+            createPlaceChip(on: number, amount: selectedBetAmount)
+
+            // Update bankroll display
+            updateBankrollDisplay()
+
+            // Update hint label to mention place bets
+            updateHintLabel()
+
+            print("Placed $\(selectedBetAmount) on \(number)")
+        }
+    }
+
+    private func createPlaceChip(on number: Int, amount: Int) {
+        // Get position of the number box
+        guard let position = crapsTable?.getPointBoxPosition(number: number) else { return }
+
+        // Create chip node (slightly smaller than pass line chip)
+        let chipRadius: CGFloat = 20
+        let chip = SKShapeNode(circleOfRadius: chipRadius)
+        chip.fillColor = SKColor(red: 0.1, green: 0.5, blue: 0.1, alpha: 1.0)  // Green for place bets
+        chip.strokeColor = .white
+        chip.lineWidth = 2
+        chip.position = CGPoint(x: position.x, y: position.y - 15)  // Offset below the number
+        chip.zPosition = 50
+
+        // Add amount label
+        let label = SKLabelNode(text: "$\(amount)")
+        label.fontSize = 14
+        label.fontName = "Arial-BoldMT"
+        label.fontColor = .white
+        label.verticalAlignmentMode = .center
+        chip.addChild(label)
+
+        // Add to table and track
+        crapsTable?.addChild(chip)
+        placeChips[number] = chip
+    }
+
+    private func removePlaceChip(from number: Int) {
+        placeChips[number]?.removeFromParent()
+        placeChips[number] = nil
+    }
+
+    private func removeAllPlaceChips() {
+        for (_, chip) in placeChips {
+            chip.removeFromParent()
+        }
+        placeChips.removeAll()
     }
 
     override func update(_ currentTime: TimeInterval) {

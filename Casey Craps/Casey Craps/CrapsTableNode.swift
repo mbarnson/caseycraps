@@ -65,13 +65,14 @@ class CrapsTableNode: SKNode {
         passLine.name = "passLineArea"
         addChild(passLine)
 
-        // Pass Line label
+        // Pass Line label (same name for click detection)
         let passLineLabel = SKLabelNode(text: "PASS LINE")
         passLineLabel.fontSize = 24
         passLineLabel.fontName = "Arial-BoldMT"
         passLineLabel.fontColor = .white
         passLineLabel.verticalAlignmentMode = .center
         passLineLabel.position = CGPoint(x: 0, y: passLineY)
+        passLineLabel.name = "passLineArea"
         addChild(passLineLabel)
     }
 
@@ -88,13 +89,14 @@ class CrapsTableNode: SKNode {
         dontPass.name = "dontPassArea"
         addChild(dontPass)
 
-        // Don't Pass Bar label
+        // Don't Pass Bar label (same name for click detection)
         let dontPassLabel = SKLabelNode(text: "DON'T PASS BAR")
         dontPassLabel.fontSize = 14
         dontPassLabel.fontName = "Arial-BoldMT"
         dontPassLabel.fontColor = .yellow
         dontPassLabel.verticalAlignmentMode = .center
         dontPassLabel.position = CGPoint(x: -tableWidth/2 + 170, y: dontPassY)
+        dontPassLabel.name = "dontPassArea"
         addChild(dontPassLabel)
     }
 
@@ -117,6 +119,7 @@ class CrapsTableNode: SKNode {
             box.strokeColor = .white
             box.lineWidth = 2
             box.position = CGPoint(x: xPosition, y: yPosition)
+            box.name = "placeNumber\(number)"
             addChild(box)
             pointBoxes[number] = box
 
@@ -137,23 +140,25 @@ class CrapsTableNode: SKNode {
             label.fontColor = .white
             label.verticalAlignmentMode = .center
             label.position = CGPoint(x: xPosition, y: yPosition)
+            label.name = "placeNumber\(number)"  // Same name for click detection
             addChild(label)
         }
     }
 
     private func addPuck() {
-        // Create puck (OFF/ON indicator) - larger and more prominent
-        let puckRadius: CGFloat = 55
+        // Create puck (OFF/ON indicator) - sized to fit on point box
+        let puckRadius: CGFloat = 35
         puckNode = SKShapeNode(circleOfRadius: puckRadius)
         puckNode?.fillColor = .black
         puckNode?.strokeColor = .white
-        puckNode?.lineWidth = 4
+        puckNode?.lineWidth = 3
         puckNode?.isHidden = true // Start hidden
+        puckNode?.zPosition = 100  // Above everything else
         addChild(puckNode!)
 
-        // Create puck label - larger and bolder
+        // Create puck label
         puckLabel = SKLabelNode(text: "OFF")
-        puckLabel?.fontSize = 24
+        puckLabel?.fontSize = 18
         puckLabel?.fontName = "Arial-BoldMT"
         puckLabel?.fontColor = .white
         puckLabel?.verticalAlignmentMode = .center
@@ -161,6 +166,13 @@ class CrapsTableNode: SKNode {
     }
 
     // MARK: - Public Methods
+
+    /// Get the position of a point number box (for placing chips)
+    /// - Parameter number: The point number (4, 5, 6, 8, 9, 10)
+    /// - Returns: The position of the box, or nil if invalid number
+    func getPointBoxPosition(number: Int) -> CGPoint? {
+        return pointBoxes[number]?.position
+    }
 
     /// Set the puck position to indicate the current point
     /// - Parameter point: The point number (4, 5, 6, 8, 9, 10) or nil for OFF
