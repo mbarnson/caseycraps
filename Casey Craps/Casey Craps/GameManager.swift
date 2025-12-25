@@ -119,15 +119,51 @@ class GameManager: ObservableObject {
     }
 
     private func handlePointRoll(total: Int, point: Int) {
+        guard let bet = player.currentBet else { return }
+
+        switch bet.type {
+        case .pass:
+            handlePassPointRoll(total: total, point: point)
+        case .dontPass:
+            handleDontPassPointRoll(total: total, point: point)
+        }
+    }
+
+    private func handlePassPointRoll(total: Int, point: Int) {
         if total == point {
-            // Hit the point - player wins
+            // Hit the point - Pass wins
+            print("Rolled \(point)! You hit the point - WIN!")
+            player.winBet()
             state = .resolved(won: true)
             pointValue = nil
         } else if total == 7 {
-            // Seven out - player loses
+            // Seven out - Pass loses
+            print("Seven out! You lose.")
+            player.loseBet()
             state = .resolved(won: false)
             pointValue = nil
+        } else {
+            // Keep rolling
+            print("Rolled \(total) - Point is \(point), keep rolling")
         }
-        // Any other roll continues the point phase
+    }
+
+    private func handleDontPassPointRoll(total: Int, point: Int) {
+        if total == point {
+            // Hit the point - Don't Pass loses
+            print("Rolled \(point)! You hit the point - LOSE!")
+            player.loseBet()
+            state = .resolved(won: false)
+            pointValue = nil
+        } else if total == 7 {
+            // Seven out - Don't Pass wins
+            print("Seven out! You win.")
+            player.winBet()
+            state = .resolved(won: true)
+            pointValue = nil
+        } else {
+            // Keep rolling
+            print("Rolled \(total) - Point is \(point), keep rolling")
+        }
     }
 }

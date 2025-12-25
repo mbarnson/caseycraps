@@ -18,6 +18,7 @@ class GameScene: SKScene {
     private var bankrollLabel: SKLabelNode!
     private var betChip: SKNode?
     private var rollButton: SKLabelNode!
+    private var outcomeLabel: SKLabelNode?
 
     override func didMove(to view: SKView) {
         // Remove template nodes from .sks file
@@ -140,26 +141,36 @@ class GameScene: SKScene {
     private func handleRollOutcome() {
         switch gameManager.state {
         case .resolved(let won):
-            if won {
-                print("WIN! Bankroll updated")
-            } else {
-                print("LOSE! Bankroll updated")
-            }
+            // Show outcome feedback
+            showOutcomeLabel(won: won)
+
             // Update bankroll display
             updateBankrollDisplay()
-
-            // Remove bet chip
-            betChip?.removeFromParent()
-            betChip = nil
 
             // Disable roll button
             rollButton.fontColor = .gray
 
-            // Reset game after short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                self.gameManager.reset()
+            // Wait 1.5 seconds, then reset
+            let waitAction = SKAction.wait(forDuration: 1.5)
+            let resetAction = SKAction.run {
+                // Remove bet chip
+                self.betChip?.removeFromParent()
+                self.betChip = nil
+
+                // Hide outcome label
+                self.outcomeLabel?.removeFromParent()
+                self.outcomeLabel = nil
+
+                // Reset puck to OFF
                 self.crapsTable?.setPuckPosition(point: nil)
+
+                // Reset game state
+                self.gameManager.reset()
+
+                // Update bankroll display
+                self.updateBankrollDisplay()
             }
+            run(SKAction.sequence([waitAction, resetAction]))
 
         case .point(let pointValue):
             print("Point is \(pointValue)")
@@ -170,6 +181,45 @@ class GameScene: SKScene {
         default:
             break
         }
+    }
+
+    private func showOutcomeLabel(won: Bool) {
+        // Remove existing label if any
+        outcomeLabel?.removeFromParent()
+
+        // Determine label text based on outcome and bet type
+        let labelText: String
+        if won {
+            labelText = "WIN!"
+        } else {
+            // Check if it was a seven-out (point phase loss with pass bet or win with don't pass)
+            if case .resolved = gameManager.state,
+               let bet = gameManager.player.currentBet {
+                if bet.type == .pass {
+                    labelText = "SEVEN OUT!"
+                } else {
+                    labelText = "LOSE!"
+                }
+            } else {
+                labelText = "LOSE!"
+            }
+        }
+
+        // Create outcome label
+        let label = SKLabelNode(text: labelText)
+        label.fontSize = 72
+        label.fontName = "Arial-BoldMT"
+        label.fontColor = won ? .green : .red
+        label.position = CGPoint(x: 0, y: 100)
+        label.zPosition = 100
+        addChild(label)
+        outcomeLabel = label
+
+        // Add pulsing animation
+        let scaleUp = SKAction.scale(to: 1.2, duration: 0.3)
+        let scaleDown = SKAction.scale(to: 1.0, duration: 0.3)
+        let pulse = SKAction.sequence([scaleUp, scaleDown])
+        label.run(SKAction.repeatForever(pulse))
     }
 
     private func createBetChip(at position: CGPoint, amount: Int) {

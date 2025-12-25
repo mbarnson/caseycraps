@@ -8,7 +8,7 @@ Build a learn-by-playing craps game for macOS. Start with clean architecture, ad
 
 - [x] **Phase 1: Foundation** - Clean game architecture replacing template code
 - [x] **Phase 2: Table & Dice** - Realistic table layout and physics-based dice
-- [ ] **Phase 3: Game Logic** - Pass line betting with come-out and point phases
+- [x] **Phase 3: Game Logic** - Pass line betting with come-out and point phases
 - [ ] **Phase 4: Audio** - Synthesized sounds for all game events
 - [ ] **Phase 5: Polish** - HUD, bet UI, visual feedback, educational cues
 
@@ -38,9 +38,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: Betting system (bankroll, chip placement, bet tracking)
-- [ ] 03-02: Come-out roll logic (7/11 wins, 2/3/12 loses, point established)
-- [ ] 03-03: Point phase logic (hit point wins, 7 loses)
+- [x] 03-01: Betting system (bankroll, chip placement, bet tracking)
+- [x] 03-02: Come-out roll logic (7/11 wins, 2/3/12 loses, point established)
+- [x] 03-03: Point phase logic (hit point wins, 7 loses)
 
 ### Phase 4: Audio
 **Goal**: Synthesized sounds that bring the table to life
@@ -66,6 +66,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2025-12-24 |
 | 2. Table & Dice | 2/2 | Complete | 2025-12-24 |
-| 3. Game Logic | 0/3 | Not started | - |
+| 3. Game Logic | 3/3 | Complete | 2025-12-24 |
 | 4. Audio | 0/2 | Not started | - |
 | 5. Polish | 0/2 | Not started | - |
