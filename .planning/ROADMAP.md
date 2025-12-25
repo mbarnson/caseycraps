@@ -69,7 +69,7 @@ Plans:
 
 Plans:
 - [x] 06-01: Test infrastructure and GameManager unit tests
-- [ ] 06-02: Models and SoundManager tests
+- [x] 06-02: Models and SoundManager tests
 - [ ] 06-03: VoiceOver accessibility for all interactive elements
 - [ ] 06-04: Hearing accessibility and Reduce Motion support
 
@@ -82,7 +82,7 @@ Plans:
 | 3. Game Logic | 3/3 | Complete | 2025-12-24 |
 | 4. Audio | 2/2 | Complete | 2025-12-24 |
 | 5. Polish | 3/3 | Complete | 2025-12-25 |
-| 6. Testing & Accessibility | 1/4 | In Progress | - |
+| 6. Testing & Accessibility | 2/4 | In Progress | - |
 
 ## v1.0 Complete
 
