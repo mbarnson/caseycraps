@@ -71,7 +71,7 @@ Plans:
 - [x] 06-01: Test infrastructure and GameManager unit tests
 - [x] 06-02: Models and SoundManager tests
 - [x] 06-03: AccessibleSKView foundation (NSAccessibilityElement overlay)
-- [ ] 06-04: Keyboard navigation and visual focus indicator
+- [x] 06-04: Keyboard navigation and visual focus indicator
 - [ ] 06-05: State sync and hearing accessibility (visual feedback for audio)
 - [ ] 06-06: Reduce Motion support and cleanup
 
@@ -84,7 +84,7 @@ Plans:
 | 3. Game Logic | 3/3 | Complete | 2025-12-24 |
 | 4. Audio | 2/2 | Complete | 2025-12-24 |
 | 5. Polish | 3/3 | Complete | 2025-12-25 |
-| 6. Testing & Accessibility | 3/6 | In Progress | - |
+| 6. Testing & Accessibility | 4/6 | In Progress | - |
 
 ## v1.0 Complete
 

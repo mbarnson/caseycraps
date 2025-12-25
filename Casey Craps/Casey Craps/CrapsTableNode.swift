@@ -23,6 +23,7 @@ class CrapsTableNode: SKNode {
     private var pointBoxes: [Int: SKShapeNode] = [:]
     private var passLineArea: SKShapeNode?
     private var dontPassArea: SKShapeNode?
+    private var currentPoint: Int?
 
     // MARK: - Initialization
 
@@ -65,6 +66,10 @@ class CrapsTableNode: SKNode {
         passLine.lineWidth = 3
         passLine.position = CGPoint(x: 0, y: passLineY)
         passLine.name = "passLineArea"
+        passLine.isAccessibilityElement = true
+        passLine.accessibilityRole = NSAccessibility.Role.button.rawValue
+        passLine.accessibilityLabel = "Pass Line bet area"
+        passLine.accessibilityHelp = "Double-click to place Pass Line bet"
         addChild(passLine)
         passLineArea = passLine
 
@@ -90,6 +95,10 @@ class CrapsTableNode: SKNode {
         dontPass.lineWidth = 2
         dontPass.position = CGPoint(x: -tableWidth/2 + 170, y: dontPassY)
         dontPass.name = "dontPassArea"
+        dontPass.isAccessibilityElement = true
+        dontPass.accessibilityRole = NSAccessibility.Role.button.rawValue
+        dontPass.accessibilityLabel = "Don't Pass bet area"
+        dontPass.accessibilityHelp = "Double-click to place Don't Pass bet"
         addChild(dontPass)
         dontPassArea = dontPass
 
@@ -124,6 +133,10 @@ class CrapsTableNode: SKNode {
             box.lineWidth = 2
             box.position = CGPoint(x: xPosition, y: yPosition)
             box.name = "placeNumber\(number)"
+            box.isAccessibilityElement = true
+            box.accessibilityRole = NSAccessibility.Role.button.rawValue
+            box.accessibilityLabel = "Place bet on \(number)"
+            updatePointBoxAccessibility(box: box, number: number)
             addChild(box)
             pointBoxes[number] = box
 
@@ -167,6 +180,11 @@ class CrapsTableNode: SKNode {
         puckLabel?.fontColor = .white
         puckLabel?.verticalAlignmentMode = .center
         puckNode?.addChild(puckLabel!)
+
+        // Add accessibility to puck
+        puckNode?.isAccessibilityElement = true
+        puckNode?.accessibilityRole = NSAccessibility.Role.staticText.rawValue
+        puckNode?.accessibilityLabel = "Point marker: OFF"
     }
 
     // MARK: - Public Methods
@@ -178,10 +196,40 @@ class CrapsTableNode: SKNode {
         return pointBoxes[number]?.position
     }
 
+    /// Get the frame of the Pass Line betting area
+    /// - Returns: The frame of the Pass Line area in the table's coordinate space
+    func getPassLineFrame() -> CGRect {
+        guard let passLineArea = passLineArea else {
+            return CGRect(x: -215, y: -120, width: 430, height: 60)
+        }
+        return passLineArea.frame
+    }
+
+    /// Get the frame of the Don't Pass betting area
+    /// - Returns: The frame of the Don't Pass area in the table's coordinate space
+    func getDontPassFrame() -> CGRect {
+        guard let dontPassArea = dontPassArea else {
+            return CGRect(x: -265, y: -110, width: 300, height: 40)
+        }
+        return dontPassArea.frame
+    }
+
+    /// Get the frame of a point number box
+    /// - Parameter number: The point number (4, 5, 6, 8, 9, 10)
+    /// - Returns: The frame of the point box in the table's coordinate space
+    func getPointBoxFrame(number: Int) -> CGRect {
+        guard let box = pointBoxes[number] else {
+            return .zero
+        }
+        return box.frame
+    }
+
     /// Set the puck position to indicate the current point
     /// - Parameter point: The point number (4, 5, 6, 8, 9, 10) or nil for OFF
     func setPuckPosition(point: Int?) {
         guard let puckNode = puckNode, let puckLabel = puckLabel else { return }
+
+        currentPoint = point
 
         if let point = point, let box = pointBoxes[point] {
             // Show puck ON the point with bright white background
@@ -207,6 +255,12 @@ class CrapsTableNode: SKNode {
             puckLabel.fontColor = .black
             puckNode.isHidden = false
 
+            // Update accessibility
+            puckNode.accessibilityLabel = "Point marker: ON \(point)"
+
+            // Update accessibility for point boxes
+            updateAllPointBoxAccessibility()
+
             puckNode.run(group)
         } else {
             // Show puck as OFF (black with white text) or hide it
@@ -215,6 +269,12 @@ class CrapsTableNode: SKNode {
             puckLabel.text = "OFF"
             puckLabel.fontColor = .white
             puckNode.isHidden = true
+
+            // Update accessibility
+            puckNode.accessibilityLabel = "Point marker: OFF"
+
+            // Update accessibility for point boxes
+            updateAllPointBoxAccessibility()
         }
     }
 
@@ -284,6 +344,53 @@ class CrapsTableNode: SKNode {
                 box.lineWidth = 2
                 box.strokeColor = .white
             }
+        }
+    }
+
+    // MARK: - Accessibility Updates
+
+    private func updatePointBoxAccessibility(box: SKShapeNode, number: Int) {
+        let odds: String
+        switch number {
+        case 4, 10:
+            odds = "9 to 5"
+        case 5, 9:
+            odds = "7 to 5"
+        case 6, 8:
+            odds = "7 to 6"
+        default:
+            odds = ""
+        }
+
+        var hint = "Double-click to place bet, pays \(odds)"
+        if currentPoint == number {
+            hint = "Current point. " + hint
+        }
+
+        box.accessibilityHelp = hint
+    }
+
+    private func updateAllPointBoxAccessibility() {
+        for (number, box) in pointBoxes {
+            updatePointBoxAccessibility(box: box, number: number)
+        }
+    }
+
+    /// Update accessibility value for betting areas based on current bets
+    /// - Parameters:
+    ///   - passLineBet: Amount of Pass Line bet, or nil if none
+    ///   - dontPassBet: Amount of Don't Pass bet, or nil if none
+    func updateBetAreaAccessibility(passLineBet: Int?, dontPassBet: Int?) {
+        if let amount = passLineBet {
+            passLineArea?.accessibilityLabel = "Pass Line bet area: $\(amount) bet placed"
+        } else {
+            passLineArea?.accessibilityLabel = "Pass Line bet area: No bet placed"
+        }
+
+        if let amount = dontPassBet {
+            dontPassArea?.accessibilityLabel = "Don't Pass bet area: $\(amount) bet placed"
+        } else {
+            dontPassArea?.accessibilityLabel = "Don't Pass bet area: No bet placed"
         }
     }
 }

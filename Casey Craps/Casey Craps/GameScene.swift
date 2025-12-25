@@ -25,6 +25,63 @@ class GameScene: SKScene {
     private var betButtons: [SKNode] = []
     private var placeChips: [Int: SKNode] = [:]  // Track chips on place bet numbers
 
+    // MARK: - Keyboard Navigation
+
+    enum FocusableElement: CaseIterable {
+        case dice
+        case passLine
+        case dontPass
+        case point4, point5, point6, point8, point9, point10
+        case bet25, bet50, bet100, bet500
+
+        var pointNumber: Int? {
+            switch self {
+            case .point4: return 4
+            case .point5: return 5
+            case .point6: return 6
+            case .point8: return 8
+            case .point9: return 9
+            case .point10: return 10
+            default: return nil
+            }
+        }
+
+        var betAmount: Int? {
+            switch self {
+            case .bet25: return 25
+            case .bet50: return 50
+            case .bet100: return 100
+            case .bet500: return 500
+            default: return nil
+            }
+        }
+
+        static func fromPointNumber(_ number: Int) -> FocusableElement? {
+            switch number {
+            case 4: return .point4
+            case 5: return .point5
+            case 6: return .point6
+            case 8: return .point8
+            case 9: return .point9
+            case 10: return .point10
+            default: return nil
+            }
+        }
+
+        static func fromBetAmount(_ amount: Int) -> FocusableElement? {
+            switch amount {
+            case 25: return .bet25
+            case 50: return .bet50
+            case 100: return .bet100
+            case 500: return .bet500
+            default: return nil
+            }
+        }
+    }
+
+    private var currentFocus: FocusableElement?
+    private var focusRing: SKShapeNode?
+
     override func didMove(to view: SKView) {
         // Remove template nodes from .sks file
         childNode(withName: "//helloLabel")?.removeFromParent()
@@ -104,6 +161,9 @@ class GameScene: SKScene {
 
         // Add bet amount controls
         createBetAmountButtons()
+
+        // Setup focus ring for keyboard navigation
+        setupFocusRing()
 
         // Initial UI hints
         updateUIHints()
@@ -315,11 +375,10 @@ class GameScene: SKScene {
 
         // Handle betting area clicks
         if (node.name == "passLineArea" || node.name == "dontPassArea") && gameManager.state == .waitingForBet {
-            let betType: BetType = node.name == "passLineArea" ? .pass : .dontPass
             let betAmount = selectedBetAmount
 
             // Place bet with player
-            if gameManager.player.placeBet(type: betType, amount: betAmount) {
+            if gameManager.player.placeBet(type: (node.name == "passLineArea" ? .pass : .dontPass), amount: betAmount) {
                 // Play chip click sound
                 SoundManager.shared.playChipClick()
 
@@ -328,6 +387,13 @@ class GameScene: SKScene {
 
                 // Update bankroll display
                 updateBankrollDisplay()
+
+                // Announce bet placement
+                let betTypeName = (node.name == "passLineArea" ? "Pass Line" : "Don't Pass")
+                announceBetPlaced(amount: betAmount, betType: betTypeName)
+
+                // Update table accessibility
+                updateTableAccessibility()
 
                 // Transition game state
                 gameManager.placeBet()
@@ -390,6 +456,9 @@ class GameScene: SKScene {
                     // Show roll result callout
                     self.showRollResult(total: total)
 
+                    // Announce roll result for VoiceOver
+                    self.announceRollResult(die1: finalValue1, die2: finalValue2, total: total)
+
                     // Update game state banner
                     self.updateGameStateBanner()
 
@@ -422,6 +491,9 @@ class GameScene: SKScene {
             // Play win sound for place bet
             SoundManager.shared.playWinSound()
 
+            // Announce place bet win
+            announceBetResolved(won: true, amount: gameManager.lastPlaceBetWinnings, betType: "Place \(winningNumber)")
+
             // Update bankroll display
             updateBankrollDisplay()
         }
@@ -433,6 +505,13 @@ class GameScene: SKScene {
 
             // Show outcome feedback
             showOutcomeLabel(won: won)
+
+            // Announce main bet resolution
+            if let bet = gameManager.player.currentBet {
+                let betTypeName = bet.type == .pass ? "Pass Line" : "Don't Pass"
+                let payout = won ? bet.amount * 2 : 0  // Win pays 1:1, so get back bet + winnings
+                announceBetResolved(won: won, amount: payout, betType: betTypeName)
+            }
 
             // Update bankroll display
             updateBankrollDisplay()
@@ -693,6 +772,9 @@ class GameScene: SKScene {
             // Update bankroll display
             updateBankrollDisplay()
 
+            // Announce place bet
+            announceBetPlaced(amount: selectedBetAmount, betType: "Place \(number)")
+
             // Update hint label to mention place bets
             updateHintLabel()
 
@@ -738,7 +820,440 @@ class GameScene: SKScene {
         placeChips.removeAll()
     }
 
+    // MARK: - Accessibility Announcements
+
+    private func announceRollResult(die1: Int, die2: Int, total: Int) {
+        var announcement = "Rolled \(die1) and \(die2), total \(total). "
+
+        // Add context based on game state
+        switch gameManager.state {
+        case .resolved(let won):
+            if won {
+                announcement += "Winner!"
+            } else {
+                // Check if it was a seven-out
+                if let bet = gameManager.player.currentBet,
+                   bet.type == .pass,
+                   gameManager.pointValue == nil {
+                    announcement += "Seven out!"
+                } else {
+                    announcement += "Loser!"
+                }
+            }
+        case .point(let value):
+            announcement += "Point is \(value)."
+        case .comeOut, .waitingForBet:
+            break
+        }
+
+        NSAccessibility.post(element: self.view as Any, notification: .announcementRequested, userInfo: [.announcement: announcement])
+    }
+
+    private func announceBetPlaced(amount: Int, betType: String) {
+        let announcement = "Placed $\(amount) on \(betType)"
+        NSAccessibility.post(element: self.view as Any, notification: .announcementRequested, userInfo: [.announcement: announcement])
+    }
+
+    private func announceBetResolved(won: Bool, amount: Int, betType: String) {
+        let announcement: String
+        if won {
+            announcement = "Won $\(amount) on \(betType)"
+        } else {
+            announcement = "Lost \(betType) bet"
+        }
+        NSAccessibility.post(element: self.view as Any, notification: .announcementRequested, userInfo: [.announcement: announcement])
+    }
+
+    private func updateTableAccessibility() {
+        // Update betting area accessibility values
+        let passLineBet: Int?
+        let dontPassBet: Int?
+
+        if let currentBet = gameManager.player.currentBet {
+            if currentBet.type == .pass {
+                passLineBet = currentBet.amount
+                dontPassBet = nil
+            } else if currentBet.type == .dontPass {
+                passLineBet = nil
+                dontPassBet = currentBet.amount
+            } else {
+                passLineBet = nil
+                dontPassBet = nil
+            }
+        } else {
+            passLineBet = nil
+            dontPassBet = nil
+        }
+
+        crapsTable?.updateBetAreaAccessibility(passLineBet: passLineBet, dontPassBet: dontPassBet)
+    }
+
+    // MARK: - Focus Ring Setup
+
+    private func setupFocusRing() {
+        focusRing = SKShapeNode()
+        focusRing?.strokeColor = NSColor.keyboardFocusIndicatorColor
+        focusRing?.lineWidth = 3
+        focusRing?.fillColor = .clear
+        focusRing?.zPosition = 1000  // Above everything
+        focusRing?.isHidden = true
+        addChild(focusRing!)
+    }
+
+    private func getDiceBounds() -> CGRect {
+        // Calculate bounds that cover both dice
+        let die1Pos = die1.position
+        let die2Pos = die2.position
+        let leftX = min(die1Pos.x, die2Pos.x) - 35
+        let rightX = max(die1Pos.x, die2Pos.x) + 35
+        let width = rightX - leftX
+        let centerX = (leftX + rightX) / 2
+        let centerY = (die1Pos.y + die2Pos.y) / 2
+
+        return CGRect(x: centerX - width/2, y: centerY - 35, width: width, height: 70)
+    }
+
+    private func updateFocusRing(for element: FocusableElement) {
+        guard let focusRing = focusRing else { return }
+
+        let frame: CGRect
+        switch element {
+        case .dice:
+            frame = getDiceBounds()
+        case .passLine:
+            frame = crapsTable?.getPassLineFrame() ?? .zero
+        case .dontPass:
+            frame = crapsTable?.getDontPassFrame() ?? .zero
+        case .point4, .point5, .point6, .point8, .point9, .point10:
+            if let number = element.pointNumber {
+                frame = crapsTable?.getPointBoxFrame(number: number) ?? .zero
+            } else {
+                frame = .zero
+            }
+        case .bet25, .bet50, .bet100, .bet500:
+            frame = getBetButtonFrame(for: element)
+        }
+
+        // Create rounded rect path
+        let path = CGPath(roundedRect: frame.insetBy(dx: -4, dy: -4),
+                         cornerWidth: 8, cornerHeight: 8, transform: nil)
+        focusRing.path = path
+        focusRing.isHidden = false
+
+        // Announce focus change for VoiceOver
+        announceFocusChange(element)
+    }
+
+    private func getBetButtonFrame(for element: FocusableElement) -> CGRect {
+        let amounts = [25, 50, 100, 500]
+        guard let amount = element.betAmount,
+              let index = amounts.firstIndex(of: amount),
+              index < betButtons.count else {
+            return .zero
+        }
+
+        let button = betButtons[index]
+        // Button is 70x40 centered at its position
+        let buttonSize = CGSize(width: 70, height: 40)
+        return CGRect(x: button.position.x - buttonSize.width/2,
+                     y: button.position.y - buttonSize.height/2,
+                     width: buttonSize.width,
+                     height: buttonSize.height)
+    }
+
+    private func announceFocusChange(_ element: FocusableElement) {
+        let announcement: String
+        switch element {
+        case .dice:
+            announcement = "Dice"
+        case .passLine:
+            announcement = "Pass Line bet area"
+        case .dontPass:
+            announcement = "Don't Pass bet area"
+        case .point4, .point5, .point6, .point8, .point9, .point10:
+            if let number = element.pointNumber {
+                announcement = "Place bet on \(number)"
+            } else {
+                announcement = "Point number"
+            }
+        case .bet25, .bet50, .bet100, .bet500:
+            if let amount = element.betAmount {
+                let isSelected = amount == selectedBetAmount
+                announcement = "$\(amount) bet amount\(isSelected ? ", currently selected" : "")"
+            } else {
+                announcement = "Bet amount"
+            }
+        }
+        NSAccessibility.post(element: self.view as Any, notification: .announcementRequested, userInfo: [.announcement: announcement])
+    }
+
+    // MARK: - Keyboard Navigation Methods
+
+    override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 48:  // Tab
+            if event.modifierFlags.contains(.shift) {
+                focusPreviousElement()
+            } else {
+                focusNextElement()
+            }
+        case 49:  // Space
+            activateFocusedElement()
+        case 36:  // Return/Enter
+            activateFocusedElement()
+        case 123: // Left arrow
+            focusPreviousInGroup()
+        case 124: // Right arrow
+            focusNextInGroup()
+        case 125: // Down arrow
+            focusNextElement()
+        case 126: // Up arrow
+            focusPreviousElement()
+        case 53:  // Escape
+            clearFocus()
+        default:
+            super.keyDown(with: event)
+        }
+    }
+
+    /// Returns only elements that are currently actionable based on game state
+    private func getActionableElements() -> [FocusableElement] {
+        var actionable: [FocusableElement] = []
+
+        // Dice: actionable when can roll and not currently rolling
+        let canRoll: Bool
+        if case .point = gameManager.state {
+            canRoll = true
+        } else {
+            canRoll = gameManager.state == .comeOut
+        }
+        if canRoll && !isRolling {
+            actionable.append(.dice)
+        }
+
+        // Pass Line / Don't Pass: actionable during waitingForBet
+        if gameManager.state == .waitingForBet {
+            // Bet amount buttons: actionable if player can afford them
+            let bankroll = gameManager.player.bankroll
+            let amounts = [25, 50, 100, 500]
+            for amount in amounts {
+                if bankroll >= amount, let element = FocusableElement.fromBetAmount(amount) {
+                    actionable.append(element)
+                }
+            }
+
+            actionable.append(.passLine)
+            actionable.append(.dontPass)
+        }
+
+        // Point numbers: actionable during point phase (except current point)
+        if case .point(let currentPoint) = gameManager.state {
+            let pointNumbers = [4, 5, 6, 8, 9, 10]
+            for num in pointNumbers {
+                if num != currentPoint {
+                    if let element = FocusableElement.fromPointNumber(num) {
+                        actionable.append(element)
+                    }
+                }
+            }
+        }
+
+        return actionable
+    }
+
+    private func focusNextElement() {
+        let actionable = getActionableElements()
+        guard !actionable.isEmpty else {
+            clearFocus()
+            return
+        }
+
+        if let current = currentFocus,
+           let currentIndex = actionable.firstIndex(of: current) {
+            let nextIndex = (currentIndex + 1) % actionable.count
+            setFocus(actionable[nextIndex])
+        } else {
+            // Start at the beginning
+            setFocus(actionable[0])
+        }
+    }
+
+    private func focusPreviousElement() {
+        let actionable = getActionableElements()
+        guard !actionable.isEmpty else {
+            clearFocus()
+            return
+        }
+
+        if let current = currentFocus,
+           let currentIndex = actionable.firstIndex(of: current) {
+            let previousIndex = currentIndex == 0 ? actionable.count - 1 : currentIndex - 1
+            setFocus(actionable[previousIndex])
+        } else {
+            // Start at the end
+            setFocus(actionable.last!)
+        }
+    }
+
+    private func focusNextInGroup() {
+        // Only works for point numbers group during point phase
+        guard let current = currentFocus,
+              current.pointNumber != nil,
+              case .point(let currentPoint) = gameManager.state else {
+            focusNextElement()
+            return
+        }
+
+        // Only actionable point numbers (exclude current point)
+        let actionablePoints: [FocusableElement] = [.point4, .point5, .point6, .point8, .point9, .point10]
+            .filter { $0.pointNumber != currentPoint }
+
+        guard !actionablePoints.isEmpty else { return }
+
+        if let currentIndex = actionablePoints.firstIndex(of: current) {
+            let nextIndex = (currentIndex + 1) % actionablePoints.count
+            setFocus(actionablePoints[nextIndex])
+        } else if let first = actionablePoints.first {
+            setFocus(first)
+        }
+    }
+
+    private func focusPreviousInGroup() {
+        // Only works for point numbers group during point phase
+        guard let current = currentFocus,
+              current.pointNumber != nil,
+              case .point(let currentPoint) = gameManager.state else {
+            focusPreviousElement()
+            return
+        }
+
+        // Only actionable point numbers (exclude current point)
+        let actionablePoints: [FocusableElement] = [.point4, .point5, .point6, .point8, .point9, .point10]
+            .filter { $0.pointNumber != currentPoint }
+
+        guard !actionablePoints.isEmpty else { return }
+
+        if let currentIndex = actionablePoints.firstIndex(of: current) {
+            let previousIndex = currentIndex == 0 ? actionablePoints.count - 1 : currentIndex - 1
+            setFocus(actionablePoints[previousIndex])
+        } else if let last = actionablePoints.last {
+            setFocus(last)
+        }
+    }
+
+    private func setFocus(_ element: FocusableElement) {
+        currentFocus = element
+        updateFocusRing(for: element)
+        print("Focus set to: \(element)")
+    }
+
+    private func clearFocus() {
+        currentFocus = nil
+        focusRing?.isHidden = true
+        print("Focus cleared")
+    }
+
+    private func activateFocusedElement() {
+        guard let focus = currentFocus else { return }
+
+        switch focus {
+        case .dice:
+            // Trigger dice roll if allowed
+            let canRoll: Bool
+            if case .point = gameManager.state {
+                canRoll = true
+            } else {
+                canRoll = gameManager.state == .comeOut
+            }
+
+            guard canRoll && !isRolling else { return }
+
+            // Simulate dice click by triggering roll
+            isRolling = true
+            die1.setGlowing(false)
+            die2.setGlowing(false)
+            SoundManager.shared.playButtonClick()
+
+            let finalValue1 = Die.roll()
+            let finalValue2 = Die.roll()
+            let total = finalValue1 + finalValue2
+
+            var completedDice = 0
+            let diceCompletion = {
+                completedDice += 1
+                if completedDice == 2 {
+                    self.isRolling = false
+                    print("Rolled: \(finalValue1) and \(finalValue2) = \(total)")
+                    self.gameManager.roll(die1: finalValue1, die2: finalValue2)
+                    self.showRollResult(total: total)
+                    self.announceRollResult(die1: finalValue1, die2: finalValue2, total: total)
+                    self.updateGameStateBanner()
+                    self.updateHintLabel()
+                    self.updateUIHints()
+                    self.handleRollOutcome()
+                }
+            }
+
+            die1.roll(to: finalValue1, completion: diceCompletion)
+            die2.roll(to: finalValue2, completion: diceCompletion)
+
+        case .passLine:
+            // Place Pass Line bet if in waitingForBet state
+            guard gameManager.state == .waitingForBet else { return }
+            if gameManager.player.placeBet(type: .pass, amount: selectedBetAmount) {
+                SoundManager.shared.playChipClick()
+                if let passLineArea = crapsTable?.childNode(withName: "passLineArea") {
+                    createBetChip(at: passLineArea.position, amount: selectedBetAmount)
+                }
+                updateBankrollDisplay()
+                announceBetPlaced(amount: selectedBetAmount, betType: "Pass Line")
+                updateTableAccessibility()
+                gameManager.placeBet()
+                updateGameStateBanner()
+                updateHintLabel()
+                updateBetButtonStates()
+                updateUIHints()
+            }
+
+        case .dontPass:
+            // Place Don't Pass bet if in waitingForBet state
+            guard gameManager.state == .waitingForBet else { return }
+            if gameManager.player.placeBet(type: .dontPass, amount: selectedBetAmount) {
+                SoundManager.shared.playChipClick()
+                if let dontPassArea = crapsTable?.childNode(withName: "dontPassArea") {
+                    createBetChip(at: dontPassArea.position, amount: selectedBetAmount)
+                }
+                updateBankrollDisplay()
+                announceBetPlaced(amount: selectedBetAmount, betType: "Don't Pass")
+                updateTableAccessibility()
+                gameManager.placeBet()
+                updateGameStateBanner()
+                updateHintLabel()
+                updateBetButtonStates()
+                updateUIHints()
+            }
+
+        case .point4, .point5, .point6, .point8, .point9, .point10:
+            // Place bet on point number during point phase
+            if let number = focus.pointNumber {
+                handlePlaceBetClick(on: number)
+            }
+
+        case .bet25, .bet50, .bet100, .bet500:
+            // Select bet amount
+            guard let amount = focus.betAmount,
+                  gameManager.player.bankroll >= amount else { return }
+            selectedBetAmount = amount
+            updateBetButtonStates()
+            SoundManager.shared.playButtonClick()
+            // Announce selection
+            NSAccessibility.post(element: self.view as Any, notification: .announcementRequested,
+                               userInfo: [.announcement: "Selected $\(amount) bet amount"])
+        }
+    }
+
     override func update(_ currentTime: TimeInterval) {
         // Called before each frame is rendered
     }
 }
+

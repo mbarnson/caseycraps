@@ -19,6 +19,7 @@ class DieNode: SKNode {
 
     private var dieBody: SKShapeNode!
     private var dotsContainer: SKNode!
+    private var isRollable: Bool = false
 
     // MARK: - Initialization
 
@@ -26,12 +27,14 @@ class DieNode: SKNode {
         super.init()
         setupDie()
         layoutDots()
+        setupAccessibility()
     }
 
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         setupDie()
         layoutDots()
+        setupAccessibility()
     }
 
     // MARK: - Setup
@@ -51,6 +54,12 @@ class DieNode: SKNode {
         addChild(dotsContainer)
     }
 
+    private func setupAccessibility() {
+        isAccessibilityElement = true
+        accessibilityRole = NSAccessibility.Role.button.rawValue
+        updateAccessibility()
+    }
+
     // MARK: - Public Methods
 
     /// Update the die to show a new value
@@ -59,17 +68,21 @@ class DieNode: SKNode {
         guard (1...6).contains(newValue) else { return }
         value = newValue
         layoutDots()
+        updateAccessibility()
     }
 
     /// Set whether the die should have a glowing/pulsing outline
     /// - Parameter glowing: true to add pulse animation, false to remove
     func setGlowing(_ glowing: Bool) {
+        isRollable = glowing
+        updateAccessibility()
+
         let actionKey = "dieGlow"
         dieBody.removeAction(forKey: actionKey)
 
         if glowing {
             // Pulsing gold outline
-            let glowUp = SKAction.customAction(withDuration: 0.6) { [weak self] node, elapsed in
+            let glowUp = SKAction.customAction(withDuration: 0.6) { node, elapsed in
                 guard let shape = node as? SKShapeNode else { return }
                 let progress = elapsed / 0.6
                 let width = 2.0 + 3.0 * sin(CGFloat(progress) * .pi)
@@ -84,7 +97,7 @@ class DieNode: SKNode {
                     alpha: 1.0
                 )
             }
-            let glowDown = SKAction.customAction(withDuration: 0.6) { [weak self] node, elapsed in
+            let glowDown = SKAction.customAction(withDuration: 0.6) { node, elapsed in
                 guard let shape = node as? SKShapeNode else { return }
                 let progress = elapsed / 0.6
                 let width = 5.0 - 3.0 * sin(CGFloat(progress) * .pi)
@@ -210,6 +223,16 @@ class DieNode: SKNode {
             dot.strokeColor = dotColor
             dot.position = position
             dotsContainer.addChild(dot)
+        }
+    }
+
+    private func updateAccessibility() {
+        accessibilityLabel = "Die showing \(value)"
+
+        if isRollable {
+            accessibilityHelp = "Double-click to roll dice"
+        } else {
+            accessibilityHelp = "Waiting for bet or roll not available"
         }
     }
 }
