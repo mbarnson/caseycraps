@@ -21,6 +21,8 @@ class CrapsTableNode: SKNode {
     private var puckNode: SKShapeNode?
     private var puckLabel: SKLabelNode?
     private var pointBoxes: [Int: SKShapeNode] = [:]
+    private var passLineArea: SKShapeNode?
+    private var dontPassArea: SKShapeNode?
 
     // MARK: - Initialization
 
@@ -64,6 +66,7 @@ class CrapsTableNode: SKNode {
         passLine.position = CGPoint(x: 0, y: passLineY)
         passLine.name = "passLineArea"
         addChild(passLine)
+        passLineArea = passLine
 
         // Pass Line label (same name for click detection)
         let passLineLabel = SKLabelNode(text: "PASS LINE")
@@ -88,6 +91,7 @@ class CrapsTableNode: SKNode {
         dontPass.position = CGPoint(x: -tableWidth/2 + 170, y: dontPassY)
         dontPass.name = "dontPassArea"
         addChild(dontPass)
+        dontPassArea = dontPass
 
         // Don't Pass Bar label (same name for click detection)
         let dontPassLabel = SKLabelNode(text: "DON'T PASS BAR")
@@ -211,6 +215,75 @@ class CrapsTableNode: SKNode {
             puckLabel.text = "OFF"
             puckLabel.fontColor = .white
             puckNode.isHidden = true
+        }
+    }
+
+    /// Highlight or unhighlight the Pass Line and Don't Pass betting areas
+    /// - Parameter highlight: true to add glow effect, false to remove
+    func highlightBettingAreas(_ highlight: Bool) {
+        let actionKey = "bettingGlow"
+
+        if highlight {
+            // Add pulsing glow to pass line
+            let glowUp = SKAction.customAction(withDuration: 1.0) { node, elapsed in
+                guard let shape = node as? SKShapeNode else { return }
+                let progress = elapsed / 1.0
+                let width = 3.0 + 3.0 * sin(CGFloat(progress) * .pi)
+                shape.lineWidth = width
+            }
+            let glowDown = SKAction.customAction(withDuration: 1.0) { node, elapsed in
+                guard let shape = node as? SKShapeNode else { return }
+                let progress = elapsed / 1.0
+                let width = 6.0 - 3.0 * sin(CGFloat(progress) * .pi)
+                shape.lineWidth = width
+            }
+            let pulse = SKAction.sequence([glowUp, glowDown])
+            let repeatPulse = SKAction.repeatForever(pulse)
+
+            passLineArea?.run(repeatPulse, withKey: actionKey)
+            dontPassArea?.run(repeatPulse, withKey: actionKey)
+        } else {
+            // Remove glow and reset to normal
+            passLineArea?.removeAction(forKey: actionKey)
+            passLineArea?.lineWidth = 3
+            dontPassArea?.removeAction(forKey: actionKey)
+            dontPassArea?.lineWidth = 2
+        }
+    }
+
+    /// Highlight place bet numbers that can be clicked
+    /// - Parameter except: The point number to NOT highlight (nil to unhighlight all)
+    func highlightPlaceNumbers(except point: Int?) {
+        let actionKey = "placeGlow"
+
+        for (number, box) in pointBoxes {
+            box.removeAction(forKey: actionKey)
+
+            if let point = point, number != point {
+                // This number can be bet on - add subtle pulse
+                let glowUp = SKAction.customAction(withDuration: 0.8) { node, elapsed in
+                    guard let shape = node as? SKShapeNode else { return }
+                    let progress = elapsed / 0.8
+                    let width = 2.0 + 1.5 * sin(CGFloat(progress) * .pi)
+                    shape.lineWidth = width
+                    let brightness = 1.0 + 0.3 * sin(CGFloat(progress) * .pi)
+                    shape.strokeColor = SKColor(white: brightness, alpha: 1.0)
+                }
+                let glowDown = SKAction.customAction(withDuration: 0.8) { node, elapsed in
+                    guard let shape = node as? SKShapeNode else { return }
+                    let progress = elapsed / 0.8
+                    let width = 3.5 - 1.5 * sin(CGFloat(progress) * .pi)
+                    shape.lineWidth = width
+                    let brightness = 1.3 - 0.3 * sin(CGFloat(progress) * .pi)
+                    shape.strokeColor = SKColor(white: brightness, alpha: 1.0)
+                }
+                let pulse = SKAction.sequence([glowUp, glowDown])
+                box.run(SKAction.repeatForever(pulse), withKey: actionKey)
+            } else {
+                // Reset to normal (either not in point phase, or this IS the point)
+                box.lineWidth = 2
+                box.strokeColor = .white
+            }
         }
     }
 }

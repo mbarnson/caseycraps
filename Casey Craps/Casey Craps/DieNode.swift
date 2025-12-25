@@ -61,6 +61,51 @@ class DieNode: SKNode {
         layoutDots()
     }
 
+    /// Set whether the die should have a glowing/pulsing outline
+    /// - Parameter glowing: true to add pulse animation, false to remove
+    func setGlowing(_ glowing: Bool) {
+        let actionKey = "dieGlow"
+        dieBody.removeAction(forKey: actionKey)
+
+        if glowing {
+            // Pulsing gold outline
+            let glowUp = SKAction.customAction(withDuration: 0.6) { [weak self] node, elapsed in
+                guard let shape = node as? SKShapeNode else { return }
+                let progress = elapsed / 0.6
+                let width = 2.0 + 3.0 * sin(CGFloat(progress) * .pi)
+                shape.lineWidth = width
+                let gold = SKColor(red: 0.9, green: 0.75, blue: 0.2, alpha: 1.0)
+                let white = SKColor.white
+                let blend = sin(CGFloat(progress) * .pi)
+                shape.strokeColor = SKColor(
+                    red: 0.3 + 0.6 * blend,
+                    green: 0.3 + 0.45 * blend,
+                    blue: 0.3 - 0.1 * blend,
+                    alpha: 1.0
+                )
+            }
+            let glowDown = SKAction.customAction(withDuration: 0.6) { [weak self] node, elapsed in
+                guard let shape = node as? SKShapeNode else { return }
+                let progress = elapsed / 0.6
+                let width = 5.0 - 3.0 * sin(CGFloat(progress) * .pi)
+                shape.lineWidth = width
+                let blend = 1.0 - sin(CGFloat(progress) * .pi)
+                shape.strokeColor = SKColor(
+                    red: 0.9 - 0.6 * (1.0 - blend),
+                    green: 0.75 - 0.45 * (1.0 - blend),
+                    blue: 0.2 + 0.1 * (1.0 - blend),
+                    alpha: 1.0
+                )
+            }
+            let pulse = SKAction.sequence([glowUp, glowDown])
+            dieBody.run(SKAction.repeatForever(pulse), withKey: actionKey)
+        } else {
+            // Reset to normal
+            dieBody.strokeColor = SKColor(white: 0.3, alpha: 1.0)
+            dieBody.lineWidth = 2
+        }
+    }
+
     /// Animate the die rolling and settle on a final value
     /// - Parameters:
     ///   - finalValue: The value to settle on (1-6)

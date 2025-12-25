@@ -17,7 +17,6 @@ class GameScene: SKScene {
     private var isRolling: Bool = false
     private var bankrollLabel: SKLabelNode!
     private var betChip: SKNode?
-    private var rollButton: SKLabelNode!
     private var outcomeLabel: SKLabelNode?
     private var gameStateBanner: SKLabelNode!
     private var hintLabel: SKLabelNode!
@@ -51,21 +50,13 @@ class GameScene: SKScene {
         die2.position = CGPoint(x: 50, y: 20)
         addChild(die2)
 
-        // Add Roll Dice button below the table
-        rollButton = SKLabelNode(text: "Roll Dice")
-        rollButton.fontSize = 36
-        rollButton.fontColor = .gray
-        rollButton.name = "rollButton"
-        rollButton.position = CGPoint(x: 0, y: -350)
-        addChild(rollButton)
-
-        // Add bankroll display at top-left (above the banner)
+        // Add bankroll display at bottom center (where Roll Dice used to be)
         bankrollLabel = SKLabelNode(text: "Bankroll: $1,000")
-        bankrollLabel.fontSize = 24
+        bankrollLabel.fontSize = 32
         bankrollLabel.fontName = "Arial-BoldMT"
         bankrollLabel.fontColor = .white
-        bankrollLabel.horizontalAlignmentMode = .left
-        bankrollLabel.position = CGPoint(x: -450, y: 340)
+        bankrollLabel.horizontalAlignmentMode = .center
+        bankrollLabel.position = CGPoint(x: 0, y: -350)
         addChild(bankrollLabel)
         updateBankrollDisplay()
 
@@ -75,7 +66,7 @@ class GameScene: SKScene {
         gameStateBanner.fontName = "Arial-BoldMT"
         gameStateBanner.fontColor = .yellow
         gameStateBanner.verticalAlignmentMode = .center
-        gameStateBanner.position = CGPoint(x: 0, y: 280)
+        gameStateBanner.position = CGPoint(x: 0, y: 320)
         gameStateBanner.zPosition = 10
 
         // Add shadow effect with background panel
@@ -83,20 +74,20 @@ class GameScene: SKScene {
         bannerBackground.fillColor = SKColor(white: 0, alpha: 0.6)
         bannerBackground.strokeColor = .yellow
         bannerBackground.lineWidth = 3
-        bannerBackground.position = CGPoint(x: 0, y: 280)
+        bannerBackground.position = CGPoint(x: 0, y: 320)
         bannerBackground.zPosition = 9
         addChild(bannerBackground)
         addChild(gameStateBanner)
 
         updateGameStateBanner()
 
-        // Add hint label below game state banner (with more spacing)
+        // Add hint label below game state banner (clear of table border at y:200)
         hintLabel = SKLabelNode(text: "")
         hintLabel.fontSize = 20
         hintLabel.fontName = "Arial"
         hintLabel.fontColor = SKColor(white: 0.8, alpha: 1.0)
         hintLabel.verticalAlignmentMode = .center
-        hintLabel.position = CGPoint(x: 0, y: 205)
+        hintLabel.position = CGPoint(x: 0, y: 250)
         hintLabel.zPosition = 10
         addChild(hintLabel)
         updateHintLabel()
@@ -113,6 +104,9 @@ class GameScene: SKScene {
 
         // Add bet amount controls
         createBetAmountButtons()
+
+        // Initial UI hints
+        updateUIHints()
     }
 
     private func updateBankrollDisplay() {
@@ -177,6 +171,37 @@ class GameScene: SKScene {
 
         case .resolved:
             hintLabel.text = ""
+        }
+    }
+
+    private func updateUIHints() {
+        // Update dice glow based on whether they can be rolled
+        let canRoll: Bool
+        if case .point = gameManager.state {
+            canRoll = true
+        } else {
+            canRoll = gameManager.state == .comeOut
+        }
+
+        // Set dice glow state
+        let shouldGlow = canRoll && !isRolling
+        die1.setGlowing(shouldGlow)
+        die2.setGlowing(shouldGlow)
+
+        // Update table highlighting through CrapsTableNode
+        switch gameManager.state {
+        case .waitingForBet:
+            crapsTable?.highlightBettingAreas(true)
+            crapsTable?.highlightPlaceNumbers(except: nil)
+        case .comeOut:
+            crapsTable?.highlightBettingAreas(false)
+            crapsTable?.highlightPlaceNumbers(except: nil)
+        case .point(let point):
+            crapsTable?.highlightBettingAreas(false)
+            crapsTable?.highlightPlaceNumbers(except: point)
+        case .resolved:
+            crapsTable?.highlightBettingAreas(false)
+            crapsTable?.highlightPlaceNumbers(except: nil)
         }
     }
 
@@ -316,12 +341,16 @@ class GameScene: SKScene {
                 // Update bet button states (hide them after bet placed)
                 updateBetButtonStates()
 
-                // Enable roll button
-                rollButton.fontColor = .white
+                // Update UI hints (makes Roll Dice throb)
+                updateUIHints()
             }
         }
 
-        if node.name == "rollButton" {
+        // Check if clicked on dice (or their children)
+        let clickedDie = (node === die1 || node.parent === die1 || node.parent?.parent === die1 ||
+                         node === die2 || node.parent === die2 || node.parent?.parent === die2)
+
+        if clickedDie {
             // Only allow rolling if bet is placed (state is comeOut or point)
             let canRoll: Bool
             if case .point = gameManager.state {
@@ -334,6 +363,10 @@ class GameScene: SKScene {
             // Prevent multiple simultaneous rolls
             guard !isRolling else { return }
             isRolling = true
+
+            // Stop dice glow while rolling
+            die1.setGlowing(false)
+            die2.setGlowing(false)
 
             // Play button click sound
             SoundManager.shared.playButtonClick()
@@ -362,6 +395,9 @@ class GameScene: SKScene {
 
                     // Update hint label
                     self.updateHintLabel()
+
+                    // Update UI hints
+                    self.updateUIHints()
 
                     // Handle outcome based on new state
                     self.handleRollOutcome()
@@ -401,9 +437,6 @@ class GameScene: SKScene {
             // Update bankroll display
             updateBankrollDisplay()
 
-            // Disable roll button
-            rollButton.fontColor = .gray
-
             // Wait 1.5 seconds, then reset
             let waitAction = SKAction.wait(forDuration: 1.5)
             let resetAction = SKAction.run {
@@ -432,6 +465,9 @@ class GameScene: SKScene {
 
                 // Update bet button states (show them again)
                 self.updateBetButtonStates()
+
+                // Update UI hints (highlights betting areas again)
+                self.updateUIHints()
             }
             run(SKAction.sequence([waitAction, resetAction]))
 
