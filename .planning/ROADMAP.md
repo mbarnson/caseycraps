@@ -63,15 +63,17 @@ Plans:
 - [x] 05-03: Place bets on point numbers (bonus feature)
 
 ### Phase 6: Testing & Accessibility
-**Goal**: Comprehensive testing and Apple Accessibility compliance
+**Goal**: Comprehensive testing and Apple Accessibility compliance (SpriteKit-compatible)
 **Depends on**: Phase 5
-**Plans**: 4 plans
+**Plans**: 6 plans
 
 Plans:
 - [x] 06-01: Test infrastructure and GameManager unit tests
 - [x] 06-02: Models and SoundManager tests
-- [ ] 06-03: VoiceOver accessibility for all interactive elements
-- [ ] 06-04: Hearing accessibility and Reduce Motion support
+- [x] 06-03: AccessibleSKView foundation (NSAccessibilityElement overlay)
+- [ ] 06-04: Keyboard navigation and visual focus indicator
+- [ ] 06-05: State sync and hearing accessibility (visual feedback for audio)
+- [ ] 06-06: Reduce Motion support and cleanup
 
 ## Progress
 
@@ -82,7 +84,7 @@ Plans:
 | 3. Game Logic | 3/3 | Complete | 2025-12-24 |
 | 4. Audio | 2/2 | Complete | 2025-12-24 |
 | 5. Polish | 3/3 | Complete | 2025-12-25 |
-| 6. Testing & Accessibility | 2/4 | In Progress | - |
+| 6. Testing & Accessibility | 3/6 | In Progress | - |
 
 ## v1.0 Complete
 

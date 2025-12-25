@@ -12,22 +12,32 @@ import GameplayKit
 class ViewController: NSViewController {
 
     @IBOutlet var skView: SKView!
-    
+    var accessibilityManager: GameAccessibilityManager?
+
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        if let view = self.skView {
+        if let view = self.skView as? AccessibleSKView {
             // Load the SKScene from 'GameScene.sks'
-            if let scene = SKScene(fileNamed: "GameScene") {
+            if let scene = SKScene(fileNamed: "GameScene") as? GameScene {
                 // Set the scale mode to scale to fit the window
                 scene.scaleMode = .aspectFill
-                
+
                 // Present the scene
                 view.presentScene(scene)
+
+                // Set up accessibility
+                accessibilityManager = GameAccessibilityManager()
+                accessibilityManager?.createElements(for: view, gameScene: scene)
+
+                // Update frames after a brief delay to ensure scene is laid out
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.accessibilityManager?.updateFrames(from: scene)
+                }
             }
-            
+
             view.ignoresSiblingOrder = true
-            
+
             view.showsFPS = true
             view.showsNodeCount = true
         }
