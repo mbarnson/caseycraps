@@ -150,6 +150,69 @@ class SoundManager {
         playTone(frequency: frequency, duration: duration, volume: volume)
     }
 
+    /// Play win sound - ascending happy tones
+    func playWinSound() {
+        guard isEnabled else { return }
+
+        // Ascending fanfare: C5 -> E5 -> G5 -> C6
+        let notes: [(frequency: Double, delay: Double)] = [
+            (523, 0.0),   // C5
+            (659, 0.12),  // E5
+            (784, 0.24),  // G5
+            (1047, 0.36)  // C6
+        ]
+
+        let noteDuration = 0.12
+        let volume: Float = 0.35
+
+        for note in notes {
+            DispatchQueue.main.asyncAfter(deadline: .now() + note.delay) { [weak self] in
+                self?.playTone(frequency: note.frequency, duration: noteDuration, volume: volume)
+            }
+        }
+    }
+
+    /// Play lose sound - descending sad tones
+    func playLoseSound() {
+        guard isEnabled else { return }
+
+        // Descending sad tones: E4 -> Eb4 -> D4
+        let notes: [(frequency: Double, delay: Double)] = [
+            (330, 0.0),   // E4
+            (311, 0.17),  // Eb4
+            (294, 0.34)   // D4
+        ]
+
+        let noteDuration = 0.17
+        let volume: Float = 0.25  // Softer than win
+
+        for note in notes {
+            DispatchQueue.main.asyncAfter(deadline: .now() + note.delay) { [weak self] in
+                self?.playTone(frequency: note.frequency, duration: noteDuration, volume: volume)
+            }
+        }
+    }
+
+    /// Play point established sound - distinctive ding notification
+    func playPointEstablished() {
+        guard isEnabled else { return }
+
+        // Two-note ding: G5 -> C6
+        let notes: [(frequency: Double, delay: Double)] = [
+            (784, 0.0),   // G5
+            (1047, 0.15)  // C6
+        ]
+
+        let noteDuration = 0.15
+        let volume: Float = 0.3
+
+        for note in notes {
+            DispatchQueue.main.asyncAfter(deadline: .now() + note.delay) { [weak self] in
+                self?.playTone(frequency: note.frequency, duration: noteDuration, volume: volume)
+            }
+        }
+    }
+
     // MARK: - Public Controls
 
     /// Enable or disable all sounds

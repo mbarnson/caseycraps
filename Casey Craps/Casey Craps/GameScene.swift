@@ -180,6 +180,8 @@ class GameScene: SKScene {
 
         case .point(let pointValue):
             print("Point is \(pointValue)")
+            // Play point established sound
+            SoundManager.shared.playPointEstablished()
             // Update puck to show ON at the point number
             crapsTable?.setPuckPosition(point: pointValue)
             // Bet chip stays on table for point phase
@@ -197,6 +199,8 @@ class GameScene: SKScene {
         let labelText: String
         if won {
             labelText = "WIN!"
+            // Play win sound
+            SoundManager.shared.playWinSound()
         } else {
             // Check if it was a seven-out (point phase loss with pass bet or win with don't pass)
             if case .resolved = gameManager.state,
@@ -209,6 +213,8 @@ class GameScene: SKScene {
             } else {
                 labelText = "LOSE!"
             }
+            // Play lose sound
+            SoundManager.shared.playLoseSound()
         }
 
         // Create outcome label
