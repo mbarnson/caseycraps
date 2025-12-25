@@ -142,18 +142,18 @@ class CrapsTableNode: SKNode {
     }
 
     private func addPuck() {
-        // Create puck (OFF/ON indicator)
-        let puckRadius: CGFloat = 25
+        // Create puck (OFF/ON indicator) - larger and more prominent
+        let puckRadius: CGFloat = 55
         puckNode = SKShapeNode(circleOfRadius: puckRadius)
         puckNode?.fillColor = .black
         puckNode?.strokeColor = .white
-        puckNode?.lineWidth = 3
+        puckNode?.lineWidth = 4
         puckNode?.isHidden = true // Start hidden
         addChild(puckNode!)
 
-        // Create puck label
+        // Create puck label - larger and bolder
         puckLabel = SKLabelNode(text: "OFF")
-        puckLabel?.fontSize = 16
+        puckLabel?.fontSize = 24
         puckLabel?.fontName = "Arial-BoldMT"
         puckLabel?.fontColor = .white
         puckLabel?.verticalAlignmentMode = .center
@@ -168,14 +168,36 @@ class CrapsTableNode: SKNode {
         guard let puckNode = puckNode, let puckLabel = puckLabel else { return }
 
         if let point = point, let box = pointBoxes[point] {
-            // Show puck ON the point
-            puckNode.position = box.position
+            // Show puck ON the point with bright white background
+            let targetPosition = box.position
+
+            // Animate puck movement
+            puckNode.removeAllActions()
+            let moveAction = SKAction.move(to: targetPosition, duration: 0.3)
+            moveAction.timingMode = .easeInEaseOut
+
+            // Scale up animation
+            let scaleUp = SKAction.scale(to: 1.2, duration: 0.15)
+            let scaleDown = SKAction.scale(to: 1.0, duration: 0.15)
+            let scaleSequence = SKAction.sequence([scaleUp, scaleDown])
+
+            // Run animations together
+            let group = SKAction.group([moveAction, scaleSequence])
+
+            // Update appearance for ON state
             puckNode.fillColor = .white
+            puckNode.strokeColor = .black
             puckLabel.text = "ON"
             puckLabel.fontColor = .black
             puckNode.isHidden = false
+
+            puckNode.run(group)
         } else {
-            // Show puck as OFF or hide it
+            // Show puck as OFF (black with white text) or hide it
+            puckNode.fillColor = .black
+            puckNode.strokeColor = .white
+            puckLabel.text = "OFF"
+            puckLabel.fontColor = .white
             puckNode.isHidden = true
         }
     }

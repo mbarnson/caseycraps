@@ -19,6 +19,9 @@ class GameScene: SKScene {
     private var betChip: SKNode?
     private var rollButton: SKLabelNode!
     private var outcomeLabel: SKLabelNode?
+    private var gameStateBanner: SKLabelNode!
+    private var selectedBetAmount: Int = 100
+    private var betButtons: [SKNode] = []
 
     override func didMove(to view: SKView) {
         // Remove template nodes from .sks file
@@ -62,6 +65,30 @@ class GameScene: SKScene {
         bankrollLabel.position = CGPoint(x: -450, y: 280)
         addChild(bankrollLabel)
         updateBankrollDisplay()
+
+        // Add game state banner at top center
+        gameStateBanner = SKLabelNode(text: "PLACE YOUR BET")
+        gameStateBanner.fontSize = 48
+        gameStateBanner.fontName = "Arial-BoldMT"
+        gameStateBanner.fontColor = .yellow
+        gameStateBanner.verticalAlignmentMode = .center
+        gameStateBanner.position = CGPoint(x: 0, y: 280)
+        gameStateBanner.zPosition = 10
+
+        // Add shadow effect with background panel
+        let bannerBackground = SKShapeNode(rectOf: CGSize(width: 600, height: 80), cornerRadius: 10)
+        bannerBackground.fillColor = SKColor(white: 0, alpha: 0.6)
+        bannerBackground.strokeColor = .yellow
+        bannerBackground.lineWidth = 3
+        bannerBackground.position = CGPoint(x: 0, y: 280)
+        bannerBackground.zPosition = 9
+        addChild(bannerBackground)
+        addChild(gameStateBanner)
+
+        updateGameStateBanner()
+
+        // Add bet amount controls
+        createBetAmountButtons()
     }
 
     private func updateBankrollDisplay() {
@@ -72,14 +99,140 @@ class GameScene: SKScene {
         bankrollLabel.text = "Bankroll: $\(formattedBankroll)"
     }
 
+    private func updateGameStateBanner() {
+        switch gameManager.state {
+        case .waitingForBet:
+            gameStateBanner.text = "PLACE YOUR BET"
+            gameStateBanner.fontColor = .yellow
+        case .comeOut:
+            gameStateBanner.text = "COME OUT ROLL"
+            gameStateBanner.fontColor = .cyan
+        case .point(let value):
+            gameStateBanner.text = "POINT IS \(value)"
+            gameStateBanner.fontColor = .white
+        case .resolved(let won):
+            if won {
+                gameStateBanner.text = "WINNER!"
+                gameStateBanner.fontColor = .green
+            } else {
+                // Check if it was a seven-out
+                if case .resolved = gameManager.state,
+                   let bet = gameManager.player.currentBet,
+                   bet.type == .pass,
+                   gameManager.pointValue == nil {
+                    gameStateBanner.text = "SEVEN OUT"
+                    gameStateBanner.fontColor = .red
+                } else {
+                    gameStateBanner.text = "LOSER"
+                    gameStateBanner.fontColor = .red
+                }
+            }
+        }
+    }
+
+    private func createBetAmountButtons() {
+        let amounts = [25, 50, 100, 500]
+        let buttonWidth: CGFloat = 100
+        let buttonHeight: CGFloat = 50
+        let spacing: CGFloat = 20
+        let totalWidth = CGFloat(amounts.count) * (buttonWidth + spacing) - spacing
+        let startX = -totalWidth / 2 + buttonWidth / 2
+        let yPosition: CGFloat = -250
+
+        for (index, amount) in amounts.enumerated() {
+            let xPosition = startX + CGFloat(index) * (buttonWidth + spacing)
+
+            // Create button background
+            let button = SKShapeNode(rectOf: CGSize(width: buttonWidth, height: buttonHeight), cornerRadius: 10)
+            button.fillColor = SKColor(red: 0.2, green: 0.2, blue: 0.8, alpha: 0.8)
+            button.strokeColor = .white
+            button.lineWidth = 2
+            button.position = CGPoint(x: xPosition, y: yPosition)
+            button.name = "betButton_\(amount)"
+            button.zPosition = 5
+            addChild(button)
+            betButtons.append(button)
+
+            // Create button label
+            let label = SKLabelNode(text: "$\(amount)")
+            label.fontSize = 24
+            label.fontName = "Arial-BoldMT"
+            label.fontColor = .white
+            label.verticalAlignmentMode = .center
+            label.name = "betButton_\(amount)"
+            label.position = CGPoint(x: 0, y: 0)
+            button.addChild(label)
+        }
+
+        updateBetButtonStates()
+    }
+
+    private func updateBetButtonStates() {
+        let amounts = [25, 50, 100, 500]
+        let bankroll = gameManager.player.bankroll
+        let isWaitingForBet = gameManager.state == .waitingForBet
+
+        for (index, amount) in amounts.enumerated() {
+            if index < betButtons.count, let button = betButtons[index] as? SKShapeNode {
+                let canAfford = bankroll >= amount
+                let isSelected = amount == selectedBetAmount
+
+                // Only show buttons in waitingForBet state
+                button.isHidden = !isWaitingForBet
+
+                if isWaitingForBet {
+                    if !canAfford {
+                        // Gray out unaffordable amounts
+                        button.fillColor = SKColor(white: 0.3, alpha: 0.5)
+                        button.strokeColor = SKColor(white: 0.5, alpha: 0.5)
+                        if let label = button.children.first as? SKLabelNode {
+                            label.fontColor = SKColor(white: 0.6, alpha: 1.0)
+                        }
+                    } else if isSelected {
+                        // Highlight selected amount
+                        button.fillColor = SKColor(red: 0.8, green: 0.6, blue: 0.0, alpha: 1.0)
+                        button.strokeColor = .yellow
+                        button.lineWidth = 4
+                        if let label = button.children.first as? SKLabelNode {
+                            label.fontColor = .white
+                        }
+                    } else {
+                        // Normal state
+                        button.fillColor = SKColor(red: 0.2, green: 0.2, blue: 0.8, alpha: 0.8)
+                        button.strokeColor = .white
+                        button.lineWidth = 2
+                        if let label = button.children.first as? SKLabelNode {
+                            label.fontColor = .white
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     override func mouseDown(with event: NSEvent) {
         let location = event.location(in: self)
         let node = atPoint(location)
 
+        // Handle bet amount button clicks
+        if let nodeName = node.name, nodeName.starts(with: "betButton_") {
+            if let amountString = nodeName.split(separator: "_").last,
+               let amount = Int(amountString) {
+                // Only allow selecting amounts player can afford
+                if gameManager.player.bankroll >= amount {
+                    selectedBetAmount = amount
+                    updateBetButtonStates()
+                    // Play button click sound
+                    SoundManager.shared.playButtonClick()
+                }
+            }
+            return
+        }
+
         // Handle betting area clicks
         if (node.name == "passLineArea" || node.name == "dontPassArea") && gameManager.state == .waitingForBet {
             let betType: BetType = node.name == "passLineArea" ? .pass : .dontPass
-            let betAmount = 100
+            let betAmount = selectedBetAmount
 
             // Place bet with player
             if gameManager.player.placeBet(type: betType, amount: betAmount) {
@@ -94,6 +247,12 @@ class GameScene: SKScene {
 
                 // Transition game state
                 gameManager.placeBet()
+
+                // Update game state banner
+                updateGameStateBanner()
+
+                // Update bet button states (hide them after bet placed)
+                updateBetButtonStates()
 
                 // Enable roll button
                 rollButton.fontColor = .white
@@ -132,6 +291,9 @@ class GameScene: SKScene {
 
                     // Process roll through GameManager
                     self.gameManager.roll(die1: finalValue1, die2: finalValue2)
+
+                    // Update game state banner
+                    self.updateGameStateBanner()
 
                     // Handle outcome based on new state
                     self.handleRollOutcome()
@@ -175,6 +337,12 @@ class GameScene: SKScene {
 
                 // Update bankroll display
                 self.updateBankrollDisplay()
+
+                // Update game state banner
+                self.updateGameStateBanner()
+
+                // Update bet button states (show them again)
+                self.updateBetButtonStates()
             }
             run(SKAction.sequence([waitAction, resetAction]))
 
