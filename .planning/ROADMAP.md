@@ -11,6 +11,7 @@ Build a learn-by-playing craps game for macOS. Start with clean architecture, ad
 - [x] **Phase 3: Game Logic** - Pass line betting with come-out and point phases
 - [x] **Phase 4: Audio** - Synthesized sounds for all game events
 - [x] **Phase 5: Polish** - HUD, bet UI, visual feedback, educational cues, Place bets
+- [ ] **Phase 6: Testing & Accessibility** - Unit tests, VoiceOver, hearing accessibility, Reduce Motion
 
 ## Phase Details
 
@@ -61,6 +62,17 @@ Plans:
 - [x] 05-02: Visual feedback and subtle educational hints
 - [x] 05-03: Place bets on point numbers (bonus feature)
 
+### Phase 6: Testing & Accessibility
+**Goal**: Comprehensive testing and Apple Accessibility compliance
+**Depends on**: Phase 5
+**Plans**: 4 plans
+
+Plans:
+- [x] 06-01: Test infrastructure and GameManager unit tests
+- [ ] 06-02: Models and SoundManager tests
+- [ ] 06-03: VoiceOver accessibility for all interactive elements
+- [ ] 06-04: Hearing accessibility and Reduce Motion support
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -70,6 +82,7 @@ Plans:
 | 3. Game Logic | 3/3 | Complete | 2025-12-24 |
 | 4. Audio | 2/2 | Complete | 2025-12-24 |
 | 5. Polish | 3/3 | Complete | 2025-12-25 |
+| 6. Testing & Accessibility | 1/4 | In Progress | - |
 
 ## v1.0 Complete
 
