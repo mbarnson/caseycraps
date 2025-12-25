@@ -71,6 +71,9 @@ class DieNode: SKNode {
             return
         }
 
+        // Play dice rolling sound
+        SoundManager.shared.playDiceRoll()
+
         // Animation parameters
         let initialPulseDuration: TimeInterval = 0.1
         let tumbleDuration: TimeInterval = 0.8

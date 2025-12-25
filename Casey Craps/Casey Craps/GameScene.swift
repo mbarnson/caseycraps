@@ -83,6 +83,9 @@ class GameScene: SKScene {
 
             // Place bet with player
             if gameManager.player.placeBet(type: betType, amount: betAmount) {
+                // Play chip click sound
+                SoundManager.shared.playChipClick()
+
                 // Create and display chip
                 createBetChip(at: node.position, amount: betAmount)
 
@@ -110,6 +113,9 @@ class GameScene: SKScene {
             // Prevent multiple simultaneous rolls
             guard !isRolling else { return }
             isRolling = true
+
+            // Play button click sound
+            SoundManager.shared.playButtonClick()
 
             // Get final dice values from the model
             let finalValue1 = Die.roll()
