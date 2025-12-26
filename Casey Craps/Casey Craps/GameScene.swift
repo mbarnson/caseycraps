@@ -26,6 +26,7 @@ class GameScene: SKScene {
     private var betButtons: [SKNode] = []
     private var placeChips: [Int: SKNode] = [:]  // Track chips on place bet numbers
     private var accessibilityManager: GameAccessibilityManager?
+    private var gameContainer: SKNode!  // Container for table + dice (scales together)
 
     // MARK: - Keyboard Navigation
 
@@ -94,20 +95,25 @@ class GameScene: SKScene {
         // Print current game state
         print("Game State: \(gameManager.state)")
 
-        // Add craps table
+        // Create game container (table + dice scale together)
+        gameContainer = SKNode()
+        gameContainer.position = CGPoint(x: 0, y: 0)
+        addChild(gameContainer)
+
+        // Add craps table to container
         let table = CrapsTableNode()
         table.position = CGPoint(x: 0, y: 0)
-        addChild(table)
+        gameContainer.addChild(table)
         crapsTable = table
 
-        // Add dice to center of table (below point numbers, above pass line)
+        // Add dice to container (below point numbers, above pass line)
         die1 = DieNode()
         die1.position = CGPoint(x: -50, y: 20)
-        addChild(die1)
+        gameContainer.addChild(die1)
 
         die2 = DieNode()
         die2.position = CGPoint(x: 50, y: 20)
-        addChild(die2)
+        gameContainer.addChild(die2)
 
         // Add bankroll display at bottom center (where Roll Dice used to be)
         bankrollLabel = SKLabelNode(text: "Bankroll: $1,000")
@@ -152,7 +158,7 @@ class GameScene: SKScene {
         addChild(hintLabel)
         updateHintLabel()
 
-        // Add roll result label (initially hidden)
+        // Add roll result label to container (initially hidden)
         rollResultLabel = SKLabelNode(text: "")
         rollResultLabel.fontSize = 66
         rollResultLabel.fontName = "Arial-BoldMT"
@@ -160,7 +166,7 @@ class GameScene: SKScene {
         rollResultLabel.position = CGPoint(x: 0, y: 0)
         rollResultLabel.zPosition = 101
         rollResultLabel.alpha = 0
-        addChild(rollResultLabel)
+        gameContainer.addChild(rollResultLabel)
 
         // Add bet amount controls
         createBetAmountButtons()
@@ -170,6 +176,9 @@ class GameScene: SKScene {
 
         // Initial UI hints
         updateUIHints()
+
+        // Initial layout positioning and scaling
+        repositionUIElements()
     }
 
     private func updateBankrollDisplay() {
@@ -1520,6 +1529,28 @@ class GameScene: SKScene {
                 betButtons[index].position = CGPoint(x: xPosition, y: buttonY)
             }
         }
+
+        // Scale game container to fit available space
+        // Design size: table is 900x400, with dice adding ~70 above/below
+        let designWidth: CGFloat = 900
+        let designHeight: CGFloat = 540  // Table + margins for dice/chips
+
+        // Available space (leave room for HUD: 140 top, 140 bottom)
+        let hudMargin: CGFloat = 150
+        let availableWidth = size.width - 40  // Small horizontal padding
+        let availableHeight = size.height - (hudMargin * 2)
+
+        // Calculate scale to fit while maintaining aspect ratio
+        let scaleX = availableWidth / designWidth
+        let scaleY = availableHeight / designHeight
+        let scale = min(scaleX, scaleY, 1.0)  // Don't scale up beyond 1.0
+
+        gameContainer?.setScale(scale)
+
+        // Center the game container vertically in available space
+        // Offset slightly toward top since buttons take more visual space
+        let centerOffset: CGFloat = -20 * scale
+        gameContainer?.position.y = centerOffset
     }
 }
 
