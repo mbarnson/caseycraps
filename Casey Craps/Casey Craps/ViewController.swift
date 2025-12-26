@@ -45,5 +45,14 @@ class ViewController: NSViewController {
             view.showsNodeCount = true
         }
     }
+
+    // MARK: - Menu Actions
+
+    @IBAction func newGame(_ sender: Any?) {
+        if let view = self.skView,
+           let scene = view.scene as? GameScene {
+            scene.startNewGame()
+        }
+    }
 }
 
