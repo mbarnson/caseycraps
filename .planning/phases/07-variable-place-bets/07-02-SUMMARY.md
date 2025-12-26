@@ -36,7 +36,7 @@
 - [x] Buttons active and styled correctly during waitingForBet
 - [x] Buttons active and styled correctly during point phase
 - [x] Build succeeds
-- [x] All 103 unit tests pass
+- [x] All 104 unit tests pass
 
 ## Deviations
 

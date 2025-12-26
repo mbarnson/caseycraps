@@ -112,4 +112,4 @@ Casey Craps is a fully functional craps game with:
   - Reduce Motion preference support
   - Color blind friendly (shapes differentiate win/lose)
   - WCAG contrast ratio compliance
-- 103 unit tests covering game logic, models, and sound
+- 104 unit tests covering game logic, models, and sound

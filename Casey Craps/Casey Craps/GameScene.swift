@@ -399,13 +399,11 @@ class GameScene: SKScene {
         }
 
         // Handle Place bet clicks on point numbers during point phase
-        if let nodeName = node.name, nodeName.starts(with: "placeNumber") {
-            if let numberString = nodeName.dropFirst("placeNumber".count).description as String?,
-               let number = Int(numberString) {
-                // Option+click decreases bet
-                let isDecrease = event.modifierFlags.contains(.option)
-                handlePlaceBetClick(on: number, isDecrease: isDecrease)
-            }
+        // Use findPlaceNumber to detect clicks through chips
+        if let number = findPlaceNumber(at: location) {
+            // Option+click decreases bet
+            let isDecrease = event.modifierFlags.contains(.option)
+            handlePlaceBetClick(on: number, isDecrease: isDecrease)
             return
         }
 
@@ -521,14 +519,11 @@ class GameScene: SKScene {
 
     override func rightMouseDown(with event: NSEvent) {
         let location = event.location(in: self)
-        let node = atPoint(location)
 
         // Handle right-click on place numbers to decrease bet
-        if let nodeName = node.name, nodeName.starts(with: "placeNumber") {
-            if let numberString = nodeName.dropFirst("placeNumber".count).description as String?,
-               let number = Int(numberString) {
-                handlePlaceBetClick(on: number, isDecrease: true)
-            }
+        // Use findPlaceNumber to detect clicks through chips
+        if let number = findPlaceNumber(at: location) {
+            handlePlaceBetClick(on: number, isDecrease: true)
         }
     }
 
@@ -623,8 +618,9 @@ class GameScene: SKScene {
                     self.accessibilityManager?.updatePointLabel(number: num, isCurrentPoint: false, betAmount: nil)
                 }
 
-                // Check if player is broke (no money AND no active bets)
-                if self.gameManager.player.bankroll == 0 &&
+                // Check if player can't continue (below minimum bet AND no active bets)
+                let minimumBet = 25
+                if self.gameManager.player.bankroll < minimumBet &&
                    self.gameManager.player.currentBet == nil &&
                    self.gameManager.player.placeBets.isEmpty {
                     self.showGameOverPrompt()
@@ -648,6 +644,9 @@ class GameScene: SKScene {
                 let placeBetAmount = gameManager.player.getPlaceBetAmount(on: num)
                 accessibilityManager?.updatePointLabel(number: num, isCurrentPoint: num == pointValue, betAmount: placeBetAmount)
             }
+
+            // Update bet button states (now active for place betting)
+            updateBetButtonStates()
 
             // Bet chip stays on table for point phase
 
@@ -845,6 +844,21 @@ class GameScene: SKScene {
     }
 
     // MARK: - Place Bets
+
+    /// Finds a place number at the given location, looking through any overlapping chips
+    private func findPlaceNumber(at location: CGPoint) -> Int? {
+        // Get all nodes at this location (not just topmost)
+        let nodesAtPoint = nodes(at: location)
+        for node in nodesAtPoint {
+            if let nodeName = node.name, nodeName.starts(with: "placeNumber") {
+                if let numberString = nodeName.dropFirst("placeNumber".count).description as String?,
+                   let number = Int(numberString) {
+                    return number
+                }
+            }
+        }
+        return nil
+    }
 
     private func handlePlaceBetClick(on number: Int, isDecrease: Bool = false) {
         // Must be in point phase to interact with place bets
@@ -1295,8 +1309,10 @@ class GameScene: SKScene {
         title.position = CGPoint(x: 0, y: 80)
         container.addChild(title)
 
-        // "You're broke!" message
-        let message = SKLabelNode(text: "You're out of chips!")
+        // Message depends on bankroll state
+        let bankroll = gameManager.player.bankroll
+        let messageText = bankroll == 0 ? "You're out of chips!" : "Can't afford the $25 minimum bet"
+        let message = SKLabelNode(text: messageText)
         message.fontSize = 28
         message.fontName = "Arial"
         message.fontColor = .white
@@ -1322,8 +1338,11 @@ class GameScene: SKScene {
         container.addChild(buttonLabel)
 
         // Announce for VoiceOver
+        let voiceOverMessage = bankroll == 0
+            ? "Game over. You're out of chips. Press Space or click New Game to start over."
+            : "Game over. Can't afford the $25 minimum bet. Press Space or click New Game to start over."
         NSAccessibility.post(element: self.view as Any, notification: .announcementRequested,
-                           userInfo: [.announcement: "Game over. You're out of chips. Press Space or click New Game to start over."])
+                           userInfo: [.announcement: voiceOverMessage])
     }
 
     func startNewGame() {
