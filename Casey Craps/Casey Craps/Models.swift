@@ -191,4 +191,11 @@ class Player {
     func loseAllPlaceBets() {
         placeBets.removeAll()
     }
+
+    /// Reset bankroll to starting amount for a new game
+    func resetBankroll() {
+        bankroll = 1000
+        currentBet = nil
+        placeBets.removeAll()
+    }
 }

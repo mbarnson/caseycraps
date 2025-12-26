@@ -365,6 +365,12 @@ class GameScene: SKScene {
         let location = event.location(in: self)
         let node = atPoint(location)
 
+        // Handle New Game button click (game over screen)
+        if node.name == "newGameButton" {
+            startNewGame()
+            return
+        }
+
         // Handle bet amount button clicks
         if let nodeName = node.name, nodeName.starts(with: "betButton_") {
             if let amountString = nodeName.split(separator: "_").last,
@@ -588,6 +594,13 @@ class GameScene: SKScene {
                 // Reset point labels
                 for num in [4, 5, 6, 8, 9, 10] {
                     self.accessibilityManager?.updatePointLabel(number: num, isCurrentPoint: false, betAmount: nil)
+                }
+
+                // Check if player is broke (no money AND no active bets)
+                if self.gameManager.player.bankroll == 0 &&
+                   self.gameManager.player.currentBet == nil &&
+                   self.gameManager.player.placeBets.isEmpty {
+                    self.showGameOverPrompt()
                 }
             }
             run(SKAction.sequence([waitAction, resetAction]))
@@ -1123,6 +1136,84 @@ class GameScene: SKScene {
         self.accessibilityManager = manager
     }
 
+    // MARK: - Game Over
+
+    private func showGameOverPrompt() {
+        // Create overlay background
+        let overlay = SKShapeNode(rectOf: CGSize(width: size.width * 2, height: size.height * 2))
+        overlay.fillColor = SKColor(white: 0, alpha: 0.7)
+        overlay.strokeColor = .clear
+        overlay.position = .zero
+        overlay.zPosition = 1000
+        overlay.name = "gameOverOverlay"
+        addChild(overlay)
+
+        // Create prompt container
+        let container = SKNode()
+        container.zPosition = 1001
+        container.name = "gameOverContainer"
+        addChild(container)
+
+        // "GAME OVER" title
+        let title = SKLabelNode(text: "GAME OVER")
+        title.fontSize = 72
+        title.fontName = "Arial-BoldMT"
+        title.fontColor = .yellow
+        title.position = CGPoint(x: 0, y: 80)
+        container.addChild(title)
+
+        // "You're broke!" message
+        let message = SKLabelNode(text: "You're out of chips!")
+        message.fontSize = 28
+        message.fontName = "Arial"
+        message.fontColor = .white
+        message.position = CGPoint(x: 0, y: 20)
+        container.addChild(message)
+
+        // "New Game" button
+        let buttonBg = SKShapeNode(rectOf: CGSize(width: 200, height: 60), cornerRadius: 10)
+        buttonBg.fillColor = SKColor(red: 0.2, green: 0.6, blue: 0.2, alpha: 1.0)
+        buttonBg.strokeColor = .white
+        buttonBg.lineWidth = 3
+        buttonBg.position = CGPoint(x: 0, y: -60)
+        buttonBg.name = "newGameButton"
+        container.addChild(buttonBg)
+
+        let buttonLabel = SKLabelNode(text: "New Game")
+        buttonLabel.fontSize = 28
+        buttonLabel.fontName = "Arial-BoldMT"
+        buttonLabel.fontColor = .white
+        buttonLabel.verticalAlignmentMode = .center
+        buttonLabel.position = CGPoint(x: 0, y: -60)
+        buttonLabel.name = "newGameButton"
+        container.addChild(buttonLabel)
+
+        // Announce for VoiceOver
+        NSAccessibility.post(element: self.view as Any, notification: .announcementRequested,
+                           userInfo: [.announcement: "Game over. You're out of chips. Press Space or click New Game to start over."])
+    }
+
+    private func startNewGame() {
+        // Remove game over UI
+        childNode(withName: "gameOverOverlay")?.removeFromParent()
+        childNode(withName: "gameOverContainer")?.removeFromParent()
+
+        // Reset player bankroll
+        gameManager.player.resetBankroll()
+
+        // Update displays
+        updateBankrollDisplay()
+        accessibilityManager?.updateBankrollLabel(amount: gameManager.player.bankroll)
+        updateGameStateBanner()
+        updateHintLabel()
+        updateBetButtonStates()
+        updateUIHints()
+
+        // Announce
+        NSAccessibility.post(element: self.view as Any, notification: .announcementRequested,
+                           userInfo: [.announcement: "New game started. Bankroll reset to $1,000."])
+    }
+
     // MARK: - Focus Ring Setup
 
     private func setupFocusRing() {
@@ -1225,6 +1316,14 @@ class GameScene: SKScene {
     // MARK: - Keyboard Navigation Methods
 
     override func keyDown(with event: NSEvent) {
+        // If game over prompt is showing, Space/Enter starts new game
+        if childNode(withName: "gameOverOverlay") != nil {
+            if event.keyCode == 49 || event.keyCode == 36 {  // Space or Enter
+                startNewGame()
+            }
+            return  // Ignore other keys during game over
+        }
+
         switch event.keyCode {
         case 48:  // Tab
             if event.modifierFlags.contains(.shift) {
@@ -1246,6 +1345,10 @@ class GameScene: SKScene {
             focusPreviousElement()
         case 53:  // Escape
             clearFocus()
+            // Exit full-screen mode if active
+            if let window = view?.window, window.styleMask.contains(.fullScreen) {
+                window.toggleFullScreen(nil)
+            }
         default:
             super.keyDown(with: event)
         }
