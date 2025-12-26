@@ -6,6 +6,7 @@
 //
 
 import SpriteKit
+import AppKit
 
 /// A visual representation of a craps table with betting areas and point indicators
 class CrapsTableNode: SKNode {
@@ -66,10 +67,6 @@ class CrapsTableNode: SKNode {
         passLine.lineWidth = 3
         passLine.position = CGPoint(x: 0, y: passLineY)
         passLine.name = "passLineArea"
-        passLine.isAccessibilityElement = true
-        passLine.accessibilityRole = NSAccessibility.Role.button.rawValue
-        passLine.accessibilityLabel = "Pass Line bet area"
-        passLine.accessibilityHelp = "Double-click to place Pass Line bet"
         addChild(passLine)
         passLineArea = passLine
 
@@ -95,10 +92,6 @@ class CrapsTableNode: SKNode {
         dontPass.lineWidth = 2
         dontPass.position = CGPoint(x: -tableWidth/2 + 170, y: dontPassY)
         dontPass.name = "dontPassArea"
-        dontPass.isAccessibilityElement = true
-        dontPass.accessibilityRole = NSAccessibility.Role.button.rawValue
-        dontPass.accessibilityLabel = "Don't Pass bet area"
-        dontPass.accessibilityHelp = "Double-click to place Don't Pass bet"
         addChild(dontPass)
         dontPassArea = dontPass
 
@@ -133,10 +126,6 @@ class CrapsTableNode: SKNode {
             box.lineWidth = 2
             box.position = CGPoint(x: xPosition, y: yPosition)
             box.name = "placeNumber\(number)"
-            box.isAccessibilityElement = true
-            box.accessibilityRole = NSAccessibility.Role.button.rawValue
-            box.accessibilityLabel = "Place bet on \(number)"
-            updatePointBoxAccessibility(box: box, number: number)
             addChild(box)
             pointBoxes[number] = box
 
@@ -180,11 +169,6 @@ class CrapsTableNode: SKNode {
         puckLabel?.fontColor = .white
         puckLabel?.verticalAlignmentMode = .center
         puckNode?.addChild(puckLabel!)
-
-        // Add accessibility to puck
-        puckNode?.isAccessibilityElement = true
-        puckNode?.accessibilityRole = NSAccessibility.Role.staticText.rawValue
-        puckNode?.accessibilityLabel = "Point marker: OFF"
     }
 
     // MARK: - Public Methods
@@ -235,18 +219,25 @@ class CrapsTableNode: SKNode {
             // Show puck ON the point with bright white background
             let targetPosition = box.position
 
-            // Animate puck movement
-            puckNode.removeAllActions()
-            let moveAction = SKAction.move(to: targetPosition, duration: 0.3)
-            moveAction.timingMode = .easeInEaseOut
+            // Check for Reduce Motion preference
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                // Instant position change, no animation
+                puckNode.position = targetPosition
+            } else {
+                // Animate puck movement
+                puckNode.removeAllActions()
+                let moveAction = SKAction.move(to: targetPosition, duration: 0.3)
+                moveAction.timingMode = .easeInEaseOut
 
-            // Scale up animation
-            let scaleUp = SKAction.scale(to: 1.2, duration: 0.15)
-            let scaleDown = SKAction.scale(to: 1.0, duration: 0.15)
-            let scaleSequence = SKAction.sequence([scaleUp, scaleDown])
+                // Scale up animation
+                let scaleUp = SKAction.scale(to: 1.2, duration: 0.15)
+                let scaleDown = SKAction.scale(to: 1.0, duration: 0.15)
+                let scaleSequence = SKAction.sequence([scaleUp, scaleDown])
 
-            // Run animations together
-            let group = SKAction.group([moveAction, scaleSequence])
+                // Run animations together
+                let group = SKAction.group([moveAction, scaleSequence])
+                puckNode.run(group)
+            }
 
             // Update appearance for ON state
             puckNode.fillColor = .white
@@ -255,13 +246,6 @@ class CrapsTableNode: SKNode {
             puckLabel.fontColor = .black
             puckNode.isHidden = false
 
-            // Update accessibility
-            puckNode.accessibilityLabel = "Point marker: ON \(point)"
-
-            // Update accessibility for point boxes
-            updateAllPointBoxAccessibility()
-
-            puckNode.run(group)
         } else {
             // Show puck as OFF (black with white text) or hide it
             puckNode.fillColor = .black
@@ -269,12 +253,6 @@ class CrapsTableNode: SKNode {
             puckLabel.text = "OFF"
             puckLabel.fontColor = .white
             puckNode.isHidden = true
-
-            // Update accessibility
-            puckNode.accessibilityLabel = "Point marker: OFF"
-
-            // Update accessibility for point boxes
-            updateAllPointBoxAccessibility()
         }
     }
 
@@ -284,24 +262,31 @@ class CrapsTableNode: SKNode {
         let actionKey = "bettingGlow"
 
         if highlight {
-            // Add pulsing glow to pass line
-            let glowUp = SKAction.customAction(withDuration: 1.0) { node, elapsed in
-                guard let shape = node as? SKShapeNode else { return }
-                let progress = elapsed / 1.0
-                let width = 3.0 + 3.0 * sin(CGFloat(progress) * .pi)
-                shape.lineWidth = width
-            }
-            let glowDown = SKAction.customAction(withDuration: 1.0) { node, elapsed in
-                guard let shape = node as? SKShapeNode else { return }
-                let progress = elapsed / 1.0
-                let width = 6.0 - 3.0 * sin(CGFloat(progress) * .pi)
-                shape.lineWidth = width
-            }
-            let pulse = SKAction.sequence([glowUp, glowDown])
-            let repeatPulse = SKAction.repeatForever(pulse)
+            // Check for Reduce Motion preference
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                // Static brighter border instead of pulse
+                passLineArea?.lineWidth = 5
+                dontPassArea?.lineWidth = 4
+            } else {
+                // Add pulsing glow to pass line (original animation)
+                let glowUp = SKAction.customAction(withDuration: 1.0) { node, elapsed in
+                    guard let shape = node as? SKShapeNode else { return }
+                    let progress = elapsed / 1.0
+                    let width = 3.0 + 3.0 * sin(CGFloat(progress) * .pi)
+                    shape.lineWidth = width
+                }
+                let glowDown = SKAction.customAction(withDuration: 1.0) { node, elapsed in
+                    guard let shape = node as? SKShapeNode else { return }
+                    let progress = elapsed / 1.0
+                    let width = 6.0 - 3.0 * sin(CGFloat(progress) * .pi)
+                    shape.lineWidth = width
+                }
+                let pulse = SKAction.sequence([glowUp, glowDown])
+                let repeatPulse = SKAction.repeatForever(pulse)
 
-            passLineArea?.run(repeatPulse, withKey: actionKey)
-            dontPassArea?.run(repeatPulse, withKey: actionKey)
+                passLineArea?.run(repeatPulse, withKey: actionKey)
+                dontPassArea?.run(repeatPulse, withKey: actionKey)
+            }
         } else {
             // Remove glow and reset to normal
             passLineArea?.removeAction(forKey: actionKey)
@@ -320,25 +305,32 @@ class CrapsTableNode: SKNode {
             box.removeAction(forKey: actionKey)
 
             if let point = point, number != point {
-                // This number can be bet on - add subtle pulse
-                let glowUp = SKAction.customAction(withDuration: 0.8) { node, elapsed in
-                    guard let shape = node as? SKShapeNode else { return }
-                    let progress = elapsed / 0.8
-                    let width = 2.0 + 1.5 * sin(CGFloat(progress) * .pi)
-                    shape.lineWidth = width
-                    let brightness = 1.0 + 0.3 * sin(CGFloat(progress) * .pi)
-                    shape.strokeColor = SKColor(white: brightness, alpha: 1.0)
+                // Check for Reduce Motion preference
+                if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                    // Static highlight instead of pulse
+                    box.lineWidth = 3.5
+                    box.strokeColor = SKColor(white: 1.3, alpha: 1.0)
+                } else {
+                    // This number can be bet on - add subtle pulse (original animation)
+                    let glowUp = SKAction.customAction(withDuration: 0.8) { node, elapsed in
+                        guard let shape = node as? SKShapeNode else { return }
+                        let progress = elapsed / 0.8
+                        let width = 2.0 + 1.5 * sin(CGFloat(progress) * .pi)
+                        shape.lineWidth = width
+                        let brightness = 1.0 + 0.3 * sin(CGFloat(progress) * .pi)
+                        shape.strokeColor = SKColor(white: brightness, alpha: 1.0)
+                    }
+                    let glowDown = SKAction.customAction(withDuration: 0.8) { node, elapsed in
+                        guard let shape = node as? SKShapeNode else { return }
+                        let progress = elapsed / 0.8
+                        let width = 3.5 - 1.5 * sin(CGFloat(progress) * .pi)
+                        shape.lineWidth = width
+                        let brightness = 1.3 - 0.3 * sin(CGFloat(progress) * .pi)
+                        shape.strokeColor = SKColor(white: brightness, alpha: 1.0)
+                    }
+                    let pulse = SKAction.sequence([glowUp, glowDown])
+                    box.run(SKAction.repeatForever(pulse), withKey: actionKey)
                 }
-                let glowDown = SKAction.customAction(withDuration: 0.8) { node, elapsed in
-                    guard let shape = node as? SKShapeNode else { return }
-                    let progress = elapsed / 0.8
-                    let width = 3.5 - 1.5 * sin(CGFloat(progress) * .pi)
-                    shape.lineWidth = width
-                    let brightness = 1.3 - 0.3 * sin(CGFloat(progress) * .pi)
-                    shape.strokeColor = SKColor(white: brightness, alpha: 1.0)
-                }
-                let pulse = SKAction.sequence([glowUp, glowDown])
-                box.run(SKAction.repeatForever(pulse), withKey: actionKey)
             } else {
                 // Reset to normal (either not in point phase, or this IS the point)
                 box.lineWidth = 2
@@ -347,50 +339,12 @@ class CrapsTableNode: SKNode {
         }
     }
 
-    // MARK: - Accessibility Updates
-
-    private func updatePointBoxAccessibility(box: SKShapeNode, number: Int) {
-        let odds: String
-        switch number {
-        case 4, 10:
-            odds = "9 to 5"
-        case 5, 9:
-            odds = "7 to 5"
-        case 6, 8:
-            odds = "7 to 6"
-        default:
-            odds = ""
-        }
-
-        var hint = "Double-click to place bet, pays \(odds)"
-        if currentPoint == number {
-            hint = "Current point. " + hint
-        }
-
-        box.accessibilityHelp = hint
-    }
-
-    private func updateAllPointBoxAccessibility() {
-        for (number, box) in pointBoxes {
-            updatePointBoxAccessibility(box: box, number: number)
-        }
-    }
-
-    /// Update accessibility value for betting areas based on current bets
+    /// Update accessibility value for betting areas based on current bets (kept for compatibility)
     /// - Parameters:
     ///   - passLineBet: Amount of Pass Line bet, or nil if none
     ///   - dontPassBet: Amount of Don't Pass bet, or nil if none
     func updateBetAreaAccessibility(passLineBet: Int?, dontPassBet: Int?) {
-        if let amount = passLineBet {
-            passLineArea?.accessibilityLabel = "Pass Line bet area: $\(amount) bet placed"
-        } else {
-            passLineArea?.accessibilityLabel = "Pass Line bet area: No bet placed"
-        }
-
-        if let amount = dontPassBet {
-            dontPassArea?.accessibilityLabel = "Don't Pass bet area: $\(amount) bet placed"
-        } else {
-            dontPassArea?.accessibilityLabel = "Don't Pass bet area: No bet placed"
-        }
+        // This method is now a no-op - accessibility is handled by AccessibleSKView
+        // Kept for compatibility with existing calls
     }
 }

@@ -123,6 +123,18 @@ class Player {
         }
     }
 
+    /// Get the amount of a place bet on a specific number
+    /// - Parameter number: The number to check
+    /// - Returns: The bet amount, or nil if no bet exists
+    func getPlaceBetAmount(on number: Int) -> Int? {
+        for bet in placeBets {
+            if case .place(let n) = bet.type, n == number {
+                return bet.amount
+            }
+        }
+        return nil
+    }
+
     /// Take down (remove) a place bet and return the money
     /// - Parameter number: The number to remove the bet from
     /// - Returns: The amount returned, or 0 if no bet existed

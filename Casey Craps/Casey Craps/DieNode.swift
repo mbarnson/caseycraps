@@ -6,6 +6,7 @@
 //
 
 import SpriteKit
+import AppKit
 
 class DieNode: SKNode {
 
@@ -19,7 +20,6 @@ class DieNode: SKNode {
 
     private var dieBody: SKShapeNode!
     private var dotsContainer: SKNode!
-    private var isRollable: Bool = false
 
     // MARK: - Initialization
 
@@ -27,14 +27,12 @@ class DieNode: SKNode {
         super.init()
         setupDie()
         layoutDots()
-        setupAccessibility()
     }
 
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         setupDie()
         layoutDots()
-        setupAccessibility()
     }
 
     // MARK: - Setup
@@ -54,12 +52,6 @@ class DieNode: SKNode {
         addChild(dotsContainer)
     }
 
-    private func setupAccessibility() {
-        isAccessibilityElement = true
-        accessibilityRole = NSAccessibility.Role.button.rawValue
-        updateAccessibility()
-    }
-
     // MARK: - Public Methods
 
     /// Update the die to show a new value
@@ -68,50 +60,51 @@ class DieNode: SKNode {
         guard (1...6).contains(newValue) else { return }
         value = newValue
         layoutDots()
-        updateAccessibility()
     }
 
     /// Set whether the die should have a glowing/pulsing outline
     /// - Parameter glowing: true to add pulse animation, false to remove
     func setGlowing(_ glowing: Bool) {
-        isRollable = glowing
-        updateAccessibility()
-
         let actionKey = "dieGlow"
         dieBody.removeAction(forKey: actionKey)
 
         if glowing {
-            // Pulsing gold outline
-            let glowUp = SKAction.customAction(withDuration: 0.6) { node, elapsed in
-                guard let shape = node as? SKShapeNode else { return }
-                let progress = elapsed / 0.6
-                let width = 2.0 + 3.0 * sin(CGFloat(progress) * .pi)
-                shape.lineWidth = width
-                let gold = SKColor(red: 0.9, green: 0.75, blue: 0.2, alpha: 1.0)
-                let white = SKColor.white
-                let blend = sin(CGFloat(progress) * .pi)
-                shape.strokeColor = SKColor(
-                    red: 0.3 + 0.6 * blend,
-                    green: 0.3 + 0.45 * blend,
-                    blue: 0.3 - 0.1 * blend,
-                    alpha: 1.0
-                )
+            // Check for Reduce Motion preference
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                // Static gold border instead of pulse
+                dieBody.strokeColor = SKColor(red: 0.9, green: 0.75, blue: 0.2, alpha: 1.0)
+                dieBody.lineWidth = 4
+            } else {
+                // Pulsing gold outline (original animation)
+                let glowUp = SKAction.customAction(withDuration: 0.6) { node, elapsed in
+                    guard let shape = node as? SKShapeNode else { return }
+                    let progress = elapsed / 0.6
+                    let width = 2.0 + 3.0 * sin(CGFloat(progress) * .pi)
+                    shape.lineWidth = width
+                    let blend = sin(CGFloat(progress) * .pi)
+                    shape.strokeColor = SKColor(
+                        red: 0.3 + 0.6 * blend,
+                        green: 0.3 + 0.45 * blend,
+                        blue: 0.3 - 0.1 * blend,
+                        alpha: 1.0
+                    )
+                }
+                let glowDown = SKAction.customAction(withDuration: 0.6) { node, elapsed in
+                    guard let shape = node as? SKShapeNode else { return }
+                    let progress = elapsed / 0.6
+                    let width = 5.0 - 3.0 * sin(CGFloat(progress) * .pi)
+                    shape.lineWidth = width
+                    let blend = 1.0 - sin(CGFloat(progress) * .pi)
+                    shape.strokeColor = SKColor(
+                        red: 0.9 - 0.6 * (1.0 - blend),
+                        green: 0.75 - 0.45 * (1.0 - blend),
+                        blue: 0.2 + 0.1 * (1.0 - blend),
+                        alpha: 1.0
+                    )
+                }
+                let pulse = SKAction.sequence([glowUp, glowDown])
+                dieBody.run(SKAction.repeatForever(pulse), withKey: actionKey)
             }
-            let glowDown = SKAction.customAction(withDuration: 0.6) { node, elapsed in
-                guard let shape = node as? SKShapeNode else { return }
-                let progress = elapsed / 0.6
-                let width = 5.0 - 3.0 * sin(CGFloat(progress) * .pi)
-                shape.lineWidth = width
-                let blend = 1.0 - sin(CGFloat(progress) * .pi)
-                shape.strokeColor = SKColor(
-                    red: 0.9 - 0.6 * (1.0 - blend),
-                    green: 0.75 - 0.45 * (1.0 - blend),
-                    blue: 0.2 + 0.1 * (1.0 - blend),
-                    alpha: 1.0
-                )
-            }
-            let pulse = SKAction.sequence([glowUp, glowDown])
-            dieBody.run(SKAction.repeatForever(pulse), withKey: actionKey)
         } else {
             // Reset to normal
             dieBody.strokeColor = SKColor(white: 0.3, alpha: 1.0)
@@ -129,10 +122,18 @@ class DieNode: SKNode {
             return
         }
 
-        // Play dice rolling sound
+        // Play dice rolling sound (always plays)
         SoundManager.shared.playDiceRoll()
 
-        // Animation parameters
+        // Check for Reduce Motion preference
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            // Immediate result, no animation
+            setValue(finalValue)
+            completion()
+            return
+        }
+
+        // Animation parameters (original animation)
         let initialPulseDuration: TimeInterval = 0.1
         let tumbleDuration: TimeInterval = 0.8
         let numberOfTumbles = 8
@@ -223,16 +224,6 @@ class DieNode: SKNode {
             dot.strokeColor = dotColor
             dot.position = position
             dotsContainer.addChild(dot)
-        }
-    }
-
-    private func updateAccessibility() {
-        accessibilityLabel = "Die showing \(value)"
-
-        if isRollable {
-            accessibilityHelp = "Double-click to roll dice"
-        } else {
-            accessibilityHelp = "Waiting for bet or roll not available"
         }
     }
 }

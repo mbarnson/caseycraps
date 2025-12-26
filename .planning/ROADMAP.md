@@ -11,7 +11,7 @@ Build a learn-by-playing craps game for macOS. Start with clean architecture, ad
 - [x] **Phase 3: Game Logic** - Pass line betting with come-out and point phases
 - [x] **Phase 4: Audio** - Synthesized sounds for all game events
 - [x] **Phase 5: Polish** - HUD, bet UI, visual feedback, educational cues, Place bets
-- [ ] **Phase 6: Testing & Accessibility** - Unit tests, VoiceOver, hearing accessibility, Reduce Motion
+- [x] **Phase 6: Testing & Accessibility** - Unit tests, VoiceOver, hearing accessibility, Reduce Motion
 
 ## Phase Details
 
@@ -72,8 +72,8 @@ Plans:
 - [x] 06-02: Models and SoundManager tests
 - [x] 06-03: AccessibleSKView foundation (NSAccessibilityElement overlay)
 - [x] 06-04: Keyboard navigation and visual focus indicator
-- [ ] 06-05: State sync and hearing accessibility (visual feedback for audio)
-- [ ] 06-06: Reduce Motion support and cleanup
+- [x] 06-05: State sync and hearing accessibility (visual feedback for audio)
+- [x] 06-06: Reduce Motion support and cleanup
 
 ## Progress
 
@@ -84,7 +84,7 @@ Plans:
 | 3. Game Logic | 3/3 | Complete | 2025-12-24 |
 | 4. Audio | 2/2 | Complete | 2025-12-24 |
 | 5. Polish | 3/3 | Complete | 2025-12-25 |
-| 6. Testing & Accessibility | 4/6 | In Progress | - |
+| 6. Testing & Accessibility | 6/6 | Complete | 2025-12-25 |
 
 ## v1.0 Complete
 
@@ -94,3 +94,11 @@ Casey Craps is a fully functional craps game with:
 - Synthesized audio feedback
 - Educational hints and roll result callouts
 - Take-down functionality for Place bets
+- Full accessibility support:
+  - VoiceOver screen reader navigation
+  - Full keyboard navigation with visual focus indicator
+  - Visual feedback for hearing accessibility
+  - Reduce Motion preference support
+  - Color blind friendly (shapes differentiate win/lose)
+  - WCAG contrast ratio compliance
+- 99 unit tests covering game logic, models, and sound

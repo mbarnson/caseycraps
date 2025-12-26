@@ -7,6 +7,7 @@
 
 import SpriteKit
 import GameplayKit
+import AppKit
 
 class GameScene: SKScene {
 
@@ -24,6 +25,7 @@ class GameScene: SKScene {
     private var selectedBetAmount: Int = 100
     private var betButtons: [SKNode] = []
     private var placeChips: [Int: SKNode] = [:]  // Track chips on place bet numbers
+    private var accessibilityManager: GameAccessibilityManager?
 
     // MARK: - Keyboard Navigation
 
@@ -133,6 +135,7 @@ class GameScene: SKScene {
         bannerBackground.lineWidth = 3
         bannerBackground.position = CGPoint(x: 0, y: 320)
         bannerBackground.zPosition = 9
+        bannerBackground.name = "bannerBackground"
         addChild(bannerBackground)
         addChild(gameStateBanner)
 
@@ -189,9 +192,13 @@ class GameScene: SKScene {
             gameStateBanner.text = "POINT IS \(value)"
             gameStateBanner.fontColor = .white
         case .resolved(let won):
+            // High-contrast colors for accessibility (WCAG 3:1 for large text)
+            let accessibleRed = SKColor(red: 1.0, green: 0.5, blue: 0.5, alpha: 1.0)  // #FF8080 - 3.3:1 contrast
+            let accessibleGreen = SKColor(red: 0.4, green: 1.0, blue: 0.4, alpha: 1.0)  // #66FF66 - high contrast
+
             if won {
                 gameStateBanner.text = "WINNER!"
-                gameStateBanner.fontColor = .green
+                gameStateBanner.fontColor = accessibleGreen
             } else {
                 // Check if it was a seven-out
                 if case .resolved = gameManager.state,
@@ -199,10 +206,10 @@ class GameScene: SKScene {
                    bet.type == .pass,
                    gameManager.pointValue == nil {
                     gameStateBanner.text = "SEVEN OUT"
-                    gameStateBanner.fontColor = .red
+                    gameStateBanner.fontColor = accessibleRed
                 } else {
                     gameStateBanner.text = "LOSER"
-                    gameStateBanner.fontColor = .red
+                    gameStateBanner.fontColor = accessibleRed
                 }
             }
         }
@@ -317,11 +324,11 @@ class GameScene: SKScene {
 
                 if isWaitingForBet {
                     if !canAfford {
-                        // Gray out unaffordable amounts
+                        // Gray out unaffordable amounts (WCAG 3:1 for large text)
                         button.fillColor = SKColor(white: 0.3, alpha: 0.5)
                         button.strokeColor = SKColor(white: 0.5, alpha: 0.5)
                         if let label = button.children.first as? SKLabelNode {
-                            label.fontColor = SKColor(white: 0.6, alpha: 1.0)
+                            label.fontColor = SKColor(white: 0.7, alpha: 1.0)  // Brighter for contrast
                         }
                     } else if isSelected {
                         // Highlight selected amount
@@ -456,6 +463,10 @@ class GameScene: SKScene {
                     // Show roll result callout
                     self.showRollResult(total: total)
 
+                    // Update dice accessibility label
+                    let canRollNext = self.gameManager.state == .comeOut || (self.gameManager.state != .waitingForBet && self.gameManager.state != .resolved(won: true) && self.gameManager.state != .resolved(won: false))
+                    self.accessibilityManager?.updateDiceLabel(die1: finalValue1, die2: finalValue2, canRoll: canRollNext)
+
                     // Announce roll result for VoiceOver
                     self.announceRollResult(die1: finalValue1, die2: finalValue2, total: total)
 
@@ -491,11 +502,15 @@ class GameScene: SKScene {
             // Play win sound for place bet
             SoundManager.shared.playWinSound()
 
+            // Show visual feedback for hearing accessibility
+            showWinFeedback(amount: gameManager.lastPlaceBetWinnings)
+
             // Announce place bet win
             announceBetResolved(won: true, amount: gameManager.lastPlaceBetWinnings, betType: "Place \(winningNumber)")
 
-            // Update bankroll display
+            // Update bankroll display and accessibility
             updateBankrollDisplay()
+            accessibilityManager?.updateBankrollLabel(amount: gameManager.player.bankroll)
         }
 
         switch gameManager.state {
@@ -506,15 +521,27 @@ class GameScene: SKScene {
             // Show outcome feedback
             showOutcomeLabel(won: won)
 
-            // Announce main bet resolution
+            // Show visual feedback for hearing accessibility
             if let bet = gameManager.player.currentBet {
                 let betTypeName = bet.type == .pass ? "Pass Line" : "Don't Pass"
+                if won {
+                    showWinFeedback(amount: bet.amount * 2)
+                } else {
+                    showLoseFeedback(betType: betTypeName)
+                }
+
+                // Announce main bet resolution
                 let payout = won ? bet.amount * 2 : 0  // Win pays 1:1, so get back bet + winnings
                 announceBetResolved(won: won, amount: payout, betType: betTypeName)
             }
 
-            // Update bankroll display
+            // Update bankroll display and accessibility
             updateBankrollDisplay()
+            accessibilityManager?.updateBankrollLabel(amount: gameManager.player.bankroll)
+
+            // Update betting area accessibility (bet resolved)
+            accessibilityManager?.updatePassLineLabel(betAmount: nil)
+            accessibilityManager?.updateDontPassLabel(betAmount: nil)
 
             // Wait 1.5 seconds, then reset
             let waitAction = SKAction.wait(forDuration: 1.5)
@@ -533,8 +560,9 @@ class GameScene: SKScene {
                 // Reset game state
                 self.gameManager.reset()
 
-                // Update bankroll display
+                // Update bankroll display and accessibility
                 self.updateBankrollDisplay()
+                self.accessibilityManager?.updateBankrollLabel(amount: self.gameManager.player.bankroll)
 
                 // Update game state banner
                 self.updateGameStateBanner()
@@ -547,6 +575,11 @@ class GameScene: SKScene {
 
                 // Update UI hints (highlights betting areas again)
                 self.updateUIHints()
+
+                // Reset point labels
+                for num in [4, 5, 6, 8, 9, 10] {
+                    self.accessibilityManager?.updatePointLabel(number: num, isCurrentPoint: false, betAmount: nil)
+                }
             }
             run(SKAction.sequence([waitAction, resetAction]))
 
@@ -554,8 +587,19 @@ class GameScene: SKScene {
             print("Point is \(pointValue)")
             // Play point established sound
             SoundManager.shared.playPointEstablished()
+
+            // Show visual feedback for hearing accessibility
+            showPointEstablished(point: pointValue)
+
             // Update puck to show ON at the point number
             crapsTable?.setPuckPosition(point: pointValue)
+
+            // Update point number accessibility labels
+            for num in [4, 5, 6, 8, 9, 10] {
+                let placeBetAmount = gameManager.player.getPlaceBetAmount(on: num)
+                accessibilityManager?.updatePointLabel(number: num, isCurrentPoint: num == pointValue, betAmount: placeBetAmount)
+            }
+
             // Bet chip stays on table for point phase
 
         default:
@@ -567,22 +611,32 @@ class GameScene: SKScene {
         // Get position of the number box
         guard let position = crapsTable?.getPointBoxPosition(number: number) else { return }
 
+        // High-contrast green for accessibility (WCAG 3:1 for large text)
+        let accessibleGreen = SKColor(red: 0.4, green: 1.0, blue: 0.4, alpha: 1.0)  // #66FF66
+
         // Create floating winnings label
         let winLabel = SKLabelNode(text: "+$\(amount)")
         winLabel.fontSize = 28
         winLabel.fontName = "Arial-BoldMT"
-        winLabel.fontColor = .green
+        winLabel.fontColor = accessibleGreen
         winLabel.position = CGPoint(x: position.x, y: position.y - 40)
         winLabel.zPosition = 200
         crapsTable?.addChild(winLabel)
 
-        // Animate floating up and fading out
-        let moveUp = SKAction.moveBy(x: 0, y: 60, duration: 1.0)
-        let fadeOut = SKAction.fadeOut(withDuration: 1.0)
-        let group = SKAction.group([moveUp, fadeOut])
         let remove = SKAction.removeFromParent()
-        let sequence = SKAction.sequence([group, remove])
-        winLabel.run(sequence)
+
+        // Check for Reduce Motion preference
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            // Static display, then remove after delay
+            let wait = SKAction.wait(forDuration: 1.0)
+            winLabel.run(SKAction.sequence([wait, remove]))
+        } else {
+            // Animate floating up and fading out
+            let moveUp = SKAction.moveBy(x: 0, y: 60, duration: 1.0)
+            let fadeOut = SKAction.fadeOut(withDuration: 1.0)
+            let group = SKAction.group([moveUp, fadeOut])
+            winLabel.run(SKAction.sequence([group, remove]))
+        }
     }
 
     private func showOutcomeLabel(won: Bool) {
@@ -611,26 +665,36 @@ class GameScene: SKScene {
             SoundManager.shared.playLoseSound()
         }
 
-        // Create outcome label
+        // Create outcome label with high-contrast colors (WCAG 3:1 for large text)
+        let accessibleRed = SKColor(red: 1.0, green: 0.5, blue: 0.5, alpha: 1.0)  // #FF8080
+        let accessibleGreen = SKColor(red: 0.4, green: 1.0, blue: 0.4, alpha: 1.0)  // #66FF66
+
         let label = SKLabelNode(text: labelText)
         label.fontSize = 72
         label.fontName = "Arial-BoldMT"
-        label.fontColor = won ? .green : .red
+        label.fontColor = won ? accessibleGreen : accessibleRed
         label.position = CGPoint(x: 0, y: 100)
         label.zPosition = 100
         addChild(label)
         outcomeLabel = label
 
-        // Add pulsing animation
-        let scaleUp = SKAction.scale(to: 1.2, duration: 0.3)
-        let scaleDown = SKAction.scale(to: 1.0, duration: 0.3)
-        let pulse = SKAction.sequence([scaleUp, scaleDown])
-        label.run(SKAction.repeatForever(pulse))
+        // Check for Reduce Motion preference
+        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            // Add pulsing animation (skip if Reduce Motion enabled)
+            let scaleUp = SKAction.scale(to: 1.2, duration: 0.3)
+            let scaleDown = SKAction.scale(to: 1.0, duration: 0.3)
+            let pulse = SKAction.sequence([scaleUp, scaleDown])
+            label.run(SKAction.repeatForever(pulse))
+        }
+        // If Reduce Motion is enabled, label displays at static size
     }
 
     private func showRollResult(total: Int) {
         // Determine color based on game state and bet type
-        let betType = gameManager.player.currentBet?.type ?? .pass
+        // High-contrast colors for accessibility (WCAG 3:1 for large text)
+        let accessibleRed = SKColor(red: 1.0, green: 0.5, blue: 0.5, alpha: 1.0)  // #FF8080
+        let accessibleGreen = SKColor(red: 0.4, green: 1.0, blue: 0.4, alpha: 1.0)  // #66FF66
+
         var color: SKColor
         var isWinning = false
         var isLosing = false
@@ -639,10 +703,10 @@ class GameScene: SKScene {
         case .resolved(let won):
             // Resolved state - show green for win, red for loss
             if won {
-                color = .green
+                color = accessibleGreen
                 isWinning = true
             } else {
-                color = .red
+                color = accessibleRed
                 isLosing = true
             }
 
@@ -666,18 +730,6 @@ class GameScene: SKScene {
         // Remove any existing animations
         rollResultLabel.removeAllActions()
 
-        // Animation sequence
-        rollResultLabel.alpha = 0
-        rollResultLabel.setScale(0)
-
-        let popIn = SKAction.group([
-            SKAction.fadeIn(withDuration: 0.2),
-            SKAction.sequence([
-                SKAction.scale(to: 1.2, duration: 0.15),
-                SKAction.scale(to: 1.0, duration: 0.1)
-            ])
-        ])
-
         // Hold duration depends on outcome type
         let holdDuration: TimeInterval
         if isWinning || isLosing {
@@ -688,11 +740,33 @@ class GameScene: SKScene {
             holdDuration = 0.6
         }
 
-        let wait = SKAction.wait(forDuration: holdDuration)
-        let fadeOut = SKAction.fadeOut(withDuration: 0.3)
+        // Check for Reduce Motion preference
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            // Instant display, then hide after delay (no animation)
+            rollResultLabel.alpha = 1
+            rollResultLabel.setScale(1)
+            let wait = SKAction.wait(forDuration: holdDuration)
+            let hide = SKAction.run { self.rollResultLabel.alpha = 0 }
+            rollResultLabel.run(SKAction.sequence([wait, hide]))
+        } else {
+            // Animation sequence
+            rollResultLabel.alpha = 0
+            rollResultLabel.setScale(0)
 
-        let sequence = SKAction.sequence([popIn, wait, fadeOut])
-        rollResultLabel.run(sequence)
+            let popIn = SKAction.group([
+                SKAction.fadeIn(withDuration: 0.2),
+                SKAction.sequence([
+                    SKAction.scale(to: 1.2, duration: 0.15),
+                    SKAction.scale(to: 1.0, duration: 0.1)
+                ])
+            ])
+
+            let wait = SKAction.wait(forDuration: holdDuration)
+            let fadeOut = SKAction.fadeOut(withDuration: 0.3)
+
+            let sequence = SKAction.sequence([popIn, wait, fadeOut])
+            rollResultLabel.run(sequence)
+        }
     }
 
     private func createBetChip(at position: CGPoint, amount: Int) {
@@ -886,6 +960,158 @@ class GameScene: SKScene {
         }
 
         crapsTable?.updateBetAreaAccessibility(passLineBet: passLineBet, dontPassBet: dontPassBet)
+
+        // Update accessibility manager labels
+        accessibilityManager?.updatePassLineLabel(betAmount: passLineBet)
+        accessibilityManager?.updateDontPassLabel(betAmount: dontPassBet)
+    }
+
+    // MARK: - Visual Feedback for Hearing Accessibility
+
+    private func showWinFeedback(amount: Int) {
+        // High-contrast green for accessibility (WCAG 3:1 for large text)
+        let accessibleGreen = SKColor(red: 0.4, green: 1.0, blue: 0.4, alpha: 1.0)  // #66FF66
+
+        // Flash border green with solid thick line (color blind: solid = win)
+        let flash = SKShapeNode(rectOf: CGSize(width: 980, height: 740))
+        flash.strokeColor = accessibleGreen
+        flash.lineWidth = 12  // Thicker for win
+        flash.fillColor = .clear
+        flash.zPosition = 900
+        addChild(flash)
+
+        // Container for win indicator
+        let container = SKNode()
+        container.position = CGPoint(x: 0, y: 0)
+        container.zPosition = 901
+        addChild(container)
+
+        // Checkmark symbol for color blind support (✓)
+        let checkmark = SKLabelNode(text: "✓")
+        checkmark.fontSize = 72
+        checkmark.fontColor = accessibleGreen
+        checkmark.fontName = "Arial-BoldMT"
+        checkmark.position = CGPoint(x: -80, y: -10)
+        checkmark.verticalAlignmentMode = .center
+        container.addChild(checkmark)
+
+        // Floating "+$amount" text
+        let winText = SKLabelNode(text: "+$\(amount)")
+        winText.fontSize = 48
+        winText.fontColor = accessibleGreen
+        winText.fontName = "Arial-BoldMT"
+        winText.position = CGPoint(x: 30, y: 0)
+        winText.verticalAlignmentMode = .center
+        container.addChild(winText)
+
+        let remove = SKAction.removeFromParent()
+
+        // Check for Reduce Motion preference
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            // Instant appearance, then remove after delay (no animation)
+            let wait = SKAction.wait(forDuration: 1.5)
+            container.run(SKAction.sequence([wait, remove]))
+            flash.run(SKAction.sequence([wait, remove]))
+        } else {
+            // Animate: rise and fade
+            let rise = SKAction.moveBy(x: 0, y: 100, duration: 1.5)
+            let fade = SKAction.fadeOut(withDuration: 1.5)
+            container.run(SKAction.sequence([SKAction.group([rise, fade]), remove]))
+
+            // Flash fade
+            flash.run(SKAction.sequence([
+                SKAction.fadeOut(withDuration: 0.5),
+                remove
+            ]))
+        }
+    }
+
+    private func showLoseFeedback(betType: String) {
+        // High-contrast red for accessibility (WCAG 3:1 for large text)
+        let accessibleRed = SKColor(red: 1.0, green: 0.5, blue: 0.5, alpha: 1.0)  // #FF8080
+
+        // Flash border red with dashed line (color blind: dashed = lose)
+        let flash = SKShapeNode(rectOf: CGSize(width: 980, height: 740))
+        flash.strokeColor = accessibleRed
+        flash.lineWidth = 6
+        flash.fillColor = .clear
+        flash.zPosition = 900
+        // Add dashed pattern for color blind differentiation
+        flash.path = flash.path?.copy(dashingWithPhase: 0, lengths: [20, 10])
+        addChild(flash)
+
+        // Container for lose indicator
+        let container = SKNode()
+        container.position = CGPoint(x: 0, y: 0)
+        container.zPosition = 901
+        addChild(container)
+
+        // X symbol for color blind support (✗)
+        let xMark = SKLabelNode(text: "✗")
+        xMark.fontSize = 60
+        xMark.fontColor = accessibleRed
+        xMark.fontName = "Arial-BoldMT"
+        xMark.position = CGPoint(x: -100, y: -8)
+        xMark.verticalAlignmentMode = .center
+        container.addChild(xMark)
+
+        // Floating "Lost [bet]" text
+        let loseText = SKLabelNode(text: "Lost \(betType)")
+        loseText.fontSize = 36
+        loseText.fontColor = accessibleRed
+        loseText.fontName = "Arial-BoldMT"
+        loseText.position = CGPoint(x: 20, y: 0)
+        loseText.verticalAlignmentMode = .center
+        container.addChild(loseText)
+
+        let remove = SKAction.removeFromParent()
+
+        // Check for Reduce Motion preference
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            // Instant appearance, then remove after delay (no animation)
+            let wait = SKAction.wait(forDuration: 1.0)
+            container.run(SKAction.sequence([wait, remove]))
+            flash.run(SKAction.sequence([wait, remove]))
+        } else {
+            // Animate: sink and fade
+            let sink = SKAction.moveBy(x: 0, y: -50, duration: 1.0)
+            let fade = SKAction.fadeOut(withDuration: 1.0)
+            container.run(SKAction.sequence([SKAction.group([sink, fade]), remove]))
+            flash.run(SKAction.sequence([SKAction.fadeOut(withDuration: 0.5), remove]))
+        }
+    }
+
+    private func showPointEstablished(point: Int) {
+        // Flash the point number box gold
+        if let boxPosition = crapsTable?.getPointBoxPosition(number: point) {
+            let highlight = SKShapeNode(rectOf: CGSize(width: 90, height: 70), cornerRadius: 8)
+            highlight.position = boxPosition
+            highlight.fillColor = SKColor(red: 1.0, green: 0.84, blue: 0, alpha: 0.5)
+            highlight.strokeColor = .clear
+            highlight.zPosition = 50
+            crapsTable?.addChild(highlight)
+
+            // Check for Reduce Motion preference
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                // Static highlight, then remove after delay (no animation)
+                let wait = SKAction.wait(forDuration: 1.2)
+                highlight.run(SKAction.sequence([wait, SKAction.removeFromParent()]))
+            } else {
+                // Animated flash 3 times
+                let flash = SKAction.sequence([
+                    SKAction.fadeIn(withDuration: 0.2),
+                    SKAction.fadeOut(withDuration: 0.2)
+                ])
+                highlight.run(SKAction.sequence([
+                    SKAction.repeat(flash, count: 3),
+                    SKAction.removeFromParent()
+                ]))
+            }
+        }
+    }
+
+    func setAccessibilityManager(_ manager: GameAccessibilityManager) {
+        self.accessibilityManager = manager
     }
 
     // MARK: - Focus Ring Setup
@@ -1186,6 +1412,11 @@ class GameScene: SKScene {
                     print("Rolled: \(finalValue1) and \(finalValue2) = \(total)")
                     self.gameManager.roll(die1: finalValue1, die2: finalValue2)
                     self.showRollResult(total: total)
+
+                    // Update dice accessibility label
+                    let canRollNext = self.gameManager.state == .comeOut || (self.gameManager.state != .waitingForBet && self.gameManager.state != .resolved(won: true) && self.gameManager.state != .resolved(won: false))
+                    self.accessibilityManager?.updateDiceLabel(die1: finalValue1, die2: finalValue2, canRoll: canRollNext)
+
                     self.announceRollResult(die1: finalValue1, die2: finalValue2, total: total)
                     self.updateGameStateBanner()
                     self.updateHintLabel()
@@ -1254,6 +1485,41 @@ class GameScene: SKScene {
 
     override func update(_ currentTime: TimeInterval) {
         // Called before each frame is rendered
+    }
+
+    override func didChangeSize(_ oldSize: CGSize) {
+        super.didChangeSize(oldSize)
+        // Reposition UI elements when window/scene size changes
+        repositionUIElements()
+    }
+
+    private func repositionUIElements() {
+        let halfHeight = size.height / 2
+
+        // Reposition top elements (banner, hint)
+        gameStateBanner?.position.y = halfHeight - 60
+        if let bannerBg = childNode(withName: "//bannerBackground") as? SKShapeNode {
+            bannerBg.position.y = halfHeight - 60
+        }
+        hintLabel?.position.y = halfHeight - 130
+
+        // Reposition bottom elements (bankroll, bet buttons)
+        bankrollLabel?.position.y = -halfHeight + 30
+
+        // Reposition bet buttons
+        let buttonY = -halfHeight + 100
+        let amounts = [25, 50, 100, 500]
+        let buttonWidth: CGFloat = 100
+        let spacing: CGFloat = 20
+        let totalWidth = CGFloat(amounts.count) * (buttonWidth + spacing) - spacing
+        let startX = -totalWidth / 2 + buttonWidth / 2
+
+        for (index, _) in amounts.enumerated() {
+            if index < betButtons.count {
+                let xPosition = startX + CGFloat(index) * (buttonWidth + spacing)
+                betButtons[index].position = CGPoint(x: xPosition, y: buttonY)
+            }
+        }
     }
 }
 

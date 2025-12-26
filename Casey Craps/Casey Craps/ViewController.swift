@@ -21,7 +21,7 @@ class ViewController: NSViewController {
             // Load the SKScene from 'GameScene.sks'
             if let scene = SKScene(fileNamed: "GameScene") as? GameScene {
                 // Set the scale mode to scale to fit the window
-                scene.scaleMode = .aspectFill
+                scene.scaleMode = .resizeFill
 
                 // Present the scene
                 view.presentScene(scene)
@@ -29,10 +29,13 @@ class ViewController: NSViewController {
                 // Set up accessibility
                 accessibilityManager = GameAccessibilityManager()
                 accessibilityManager?.createElements(for: view, gameScene: scene)
+                scene.setAccessibilityManager(accessibilityManager!)
 
                 // Update frames after a brief delay to ensure scene is laid out
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     self.accessibilityManager?.updateFrames(from: scene)
+                    // Set initial bankroll label
+                    self.accessibilityManager?.updateBankrollLabel(amount: GameManager.shared.player.bankroll)
                 }
             }
 

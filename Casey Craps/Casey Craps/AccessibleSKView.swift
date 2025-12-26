@@ -132,8 +132,8 @@ class GameAccessibilityManager {
         }
 
         // Update dice element (cover both dice)
-        if let die1 = gameScene.childNode(withName: "//die1") as? SKNode,
-           let die2 = gameScene.childNode(withName: "//die2") as? SKNode {
+        if let die1 = gameScene.childNode(withName: "//die1"),
+           let die2 = gameScene.childNode(withName: "//die2") {
             // Calculate bounds that cover both dice
             let leftX = min(die1.position.x, die2.position.x) - 30
             let rightX = max(die1.position.x, die2.position.x) + 30
@@ -210,5 +210,53 @@ class GameAccessibilityManager {
         } else {
             diceElement?.setAccessibilityHelp("Place a bet first")
         }
+    }
+
+    // MARK: - Dynamic State Updates
+
+    func updateDiceLabel(die1: Int, die2: Int, canRoll: Bool) {
+        let total = die1 + die2
+        diceElement?.setAccessibilityLabel("Dice showing \(die1) and \(die2), total \(total)")
+        if canRoll {
+            diceElement?.setAccessibilityHelp("Double-click to roll dice")
+        } else {
+            diceElement?.setAccessibilityHelp("Cannot roll now")
+        }
+    }
+
+    func updatePassLineLabel(betAmount: Int?) {
+        if let amount = betAmount {
+            passLineElement?.setAccessibilityLabel("Pass Line bet area, $\(amount) bet placed")
+        } else {
+            passLineElement?.setAccessibilityLabel("Pass Line bet area, no bet")
+        }
+    }
+
+    func updateDontPassLabel(betAmount: Int?) {
+        if let amount = betAmount {
+            dontPassElement?.setAccessibilityLabel("Don't Pass bet area, $\(amount) bet placed")
+        } else {
+            dontPassElement?.setAccessibilityLabel("Don't Pass bet area, no bet")
+        }
+    }
+
+    func updatePointLabel(number: Int, isCurrentPoint: Bool, betAmount: Int?) {
+        var label = "Place bet on \(number)"
+        if isCurrentPoint {
+            label = "Current point: \(number)"
+        }
+        if let amount = betAmount {
+            label += ", $\(amount) bet placed"
+        }
+        pointElements[number]?.setAccessibilityLabel(label)
+    }
+
+    func updateBankrollLabel(amount: Int) {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = ","
+        let formatted = formatter.string(from: NSNumber(value: amount)) ?? "\(amount)"
+        bankrollElement?.setAccessibilityLabel("Bankroll: $\(formatted)")
+        bankrollElement?.setAccessibilityValue("$\(formatted)")
     }
 }
