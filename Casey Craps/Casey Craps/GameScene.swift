@@ -322,39 +322,51 @@ class GameScene: SKScene {
         let amounts = [25, 50, 100, 500]
         let bankroll = gameManager.player.bankroll
         let isWaitingForBet = gameManager.state == .waitingForBet
+        let isPointPhase: Bool
+        if case .point = gameManager.state { isPointPhase = true } else { isPointPhase = false }
+
+        // Buttons are actionable during waitingForBet and point phases
+        let buttonsActive = isWaitingForBet || isPointPhase
 
         for (index, amount) in amounts.enumerated() {
             if index < betButtons.count, let button = betButtons[index] as? SKShapeNode {
                 let canAfford = bankroll >= amount
                 let isSelected = amount == selectedBetAmount
 
-                // Only show buttons in waitingForBet state
-                button.isHidden = !isWaitingForBet
+                // Always show buttons (never hidden) for UI consistency
+                button.isHidden = false
 
-                if isWaitingForBet {
-                    if !canAfford {
-                        // Gray out unaffordable amounts (WCAG 3:1 for large text)
-                        button.fillColor = SKColor(white: 0.3, alpha: 0.5)
-                        button.strokeColor = SKColor(white: 0.5, alpha: 0.5)
-                        if let label = button.children.first as? SKLabelNode {
-                            label.fontColor = SKColor(white: 0.7, alpha: 1.0)  // Brighter for contrast
-                        }
-                    } else if isSelected {
-                        // Highlight selected amount
-                        button.fillColor = SKColor(red: 0.8, green: 0.6, blue: 0.0, alpha: 1.0)
-                        button.strokeColor = .yellow
-                        button.lineWidth = 4
-                        if let label = button.children.first as? SKLabelNode {
-                            label.fontColor = .white
-                        }
-                    } else {
-                        // Normal state
-                        button.fillColor = SKColor(red: 0.2, green: 0.2, blue: 0.8, alpha: 0.8)
-                        button.strokeColor = .white
-                        button.lineWidth = 2
-                        if let label = button.children.first as? SKLabelNode {
-                            label.fontColor = .white
-                        }
+                if !buttonsActive {
+                    // Disabled state: grayed out during comeOut and resolved
+                    button.fillColor = SKColor(white: 0.2, alpha: 0.4)
+                    button.strokeColor = SKColor(white: 0.4, alpha: 0.4)
+                    button.lineWidth = 1
+                    if let label = button.children.first as? SKLabelNode {
+                        label.fontColor = SKColor(white: 0.5, alpha: 0.6)
+                    }
+                } else if !canAfford {
+                    // Can't afford: grayed but slightly more visible than disabled
+                    button.fillColor = SKColor(white: 0.3, alpha: 0.5)
+                    button.strokeColor = SKColor(white: 0.5, alpha: 0.5)
+                    button.lineWidth = 2
+                    if let label = button.children.first as? SKLabelNode {
+                        label.fontColor = SKColor(white: 0.7, alpha: 1.0)
+                    }
+                } else if isSelected {
+                    // Selected: gold highlight
+                    button.fillColor = SKColor(red: 0.8, green: 0.6, blue: 0.0, alpha: 1.0)
+                    button.strokeColor = .yellow
+                    button.lineWidth = 4
+                    if let label = button.children.first as? SKLabelNode {
+                        label.fontColor = .white
+                    }
+                } else {
+                    // Normal: blue
+                    button.fillColor = SKColor(red: 0.2, green: 0.2, blue: 0.8, alpha: 0.8)
+                    button.strokeColor = .white
+                    button.lineWidth = 2
+                    if let label = button.children.first as? SKLabelNode {
+                        label.fontColor = .white
                     }
                 }
             }
@@ -390,7 +402,9 @@ class GameScene: SKScene {
         if let nodeName = node.name, nodeName.starts(with: "placeNumber") {
             if let numberString = nodeName.dropFirst("placeNumber".count).description as String?,
                let number = Int(numberString) {
-                handlePlaceBetClick(on: number)
+                // Option+click decreases bet
+                let isDecrease = event.modifierFlags.contains(.option)
+                handlePlaceBetClick(on: number, isDecrease: isDecrease)
             }
             return
         }
@@ -502,6 +516,19 @@ class GameScene: SKScene {
             // Animate both dice
             die1.roll(to: finalValue1, completion: diceCompletion)
             die2.roll(to: finalValue2, completion: diceCompletion)
+        }
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        let location = event.location(in: self)
+        let node = atPoint(location)
+
+        // Handle right-click on place numbers to decrease bet
+        if let nodeName = node.name, nodeName.starts(with: "placeNumber") {
+            if let numberString = nodeName.dropFirst("placeNumber".count).description as String?,
+               let number = Int(numberString) {
+                handlePlaceBetClick(on: number, isDecrease: true)
+            }
         }
     }
 
@@ -819,62 +846,71 @@ class GameScene: SKScene {
 
     // MARK: - Place Bets
 
-    private func handlePlaceBetClick(on number: Int) {
+    private func handlePlaceBetClick(on number: Int, isDecrease: Bool = false) {
         // Must be in point phase to interact with place bets
         guard case .point = gameManager.state else {
             print("Can only place/remove bets during point phase")
             return
         }
 
-        // Check if player already has a bet on this number - if so, take it down
-        if gameManager.player.hasPlaceBet(on: number) {
-            let returned = gameManager.player.takeDownPlaceBet(number: number)
-            if returned > 0 {
-                // Play chip click sound
-                SoundManager.shared.playChipClick()
+        if isDecrease {
+            // Decrease existing bet
+            let result = gameManager.player.decreasePlaceBet(number: number, amount: selectedBetAmount)
+            if result.success {
+                if result.newAmount == 0 {
+                    // Bet removed entirely
+                    SoundManager.shared.playBetDecrease()
+                    removePlaceChipAnimated(from: number)
+                    announceBetRemoved(number: number)
+                } else {
+                    // Bet decreased
+                    SoundManager.shared.playBetDecrease()
+                    updatePlaceChip(on: number, amount: result.newAmount, decreased: true)
+                    announceBetChanged(number: number, newAmount: result.newAmount, increased: false)
+                }
+                updateBankrollDisplay()
+                updateHintLabel()
+                print("Decreased bet on \(number), new amount: $\(result.newAmount)")
+            }
+        } else {
+            // Increase or place new bet
+            // Check if we can place a bet on this number (not the point)
+            guard gameManager.canPlaceBet(on: number) else {
+                print("Cannot place bet on \(number)")
+                return
+            }
 
-                // Remove the chip
-                removePlaceChip(from: number)
+            // Check if player can afford the bet
+            guard gameManager.player.bankroll >= selectedBetAmount else {
+                print("Cannot afford place bet")
+                return
+            }
+
+            let hadExistingBet = gameManager.player.hasPlaceBet(on: number)
+
+            // Place or increase the bet
+            if gameManager.player.placePlaceBet(number: number, amount: selectedBetAmount) {
+                if hadExistingBet {
+                    // Increased existing bet
+                    SoundManager.shared.playBetIncrease()
+                    let newAmount = gameManager.player.getPlaceBetAmount(on: number) ?? 0
+                    updatePlaceChip(on: number, amount: newAmount, decreased: false)
+                    announceBetChanged(number: number, newAmount: newAmount, increased: true)
+                    print("Increased bet on \(number) to $\(newAmount)")
+                } else {
+                    // New bet placed
+                    SoundManager.shared.playChipClick()
+                    createPlaceChip(on: number, amount: selectedBetAmount)
+                    announceBetPlaced(amount: selectedBetAmount, betType: "Place \(number)")
+                    print("Placed $\(selectedBetAmount) on \(number)")
+                }
 
                 // Update bankroll display
                 updateBankrollDisplay()
 
-                print("Took down $\(returned) from \(number)")
+                // Update hint label
+                updateHintLabel()
             }
-            return
-        }
-
-        // Otherwise, try to place a new bet
-        // Check if we can place a bet on this number (not the point)
-        guard gameManager.canPlaceBet(on: number) else {
-            print("Cannot place bet on \(number)")
-            return
-        }
-
-        // Check if player can afford the bet
-        guard gameManager.player.bankroll >= selectedBetAmount else {
-            print("Cannot afford place bet")
-            return
-        }
-
-        // Place the bet
-        if gameManager.player.placePlaceBet(number: number, amount: selectedBetAmount) {
-            // Play chip click sound
-            SoundManager.shared.playChipClick()
-
-            // Create and display chip on the number
-            createPlaceChip(on: number, amount: selectedBetAmount)
-
-            // Update bankroll display
-            updateBankrollDisplay()
-
-            // Announce place bet
-            announceBetPlaced(amount: selectedBetAmount, betType: "Place \(number)")
-
-            // Update hint label to mention place bets
-            updateHintLabel()
-
-            print("Placed $\(selectedBetAmount) on \(number)")
         }
     }
 
@@ -914,6 +950,92 @@ class GameScene: SKScene {
             chip.removeFromParent()
         }
         placeChips.removeAll()
+    }
+
+    private func updatePlaceChip(on number: Int, amount: Int, decreased: Bool) {
+        guard let chip = placeChips[number] as? SKShapeNode else { return }
+
+        // Update label
+        if let label = chip.children.first as? SKLabelNode {
+            label.text = "$\(amount)"
+        }
+
+        // Show visual feedback
+        showBetChangeFeedback(on: number, amount: decreased ? -selectedBetAmount : selectedBetAmount, decreased: decreased)
+    }
+
+    private func removePlaceChipAnimated(from number: Int) {
+        guard let chip = placeChips[number] else { return }
+
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            chip.removeFromParent()
+        } else {
+            let shrink = SKAction.scale(to: 0, duration: 0.2)
+            let fade = SKAction.fadeOut(withDuration: 0.2)
+            let remove = SKAction.removeFromParent()
+            chip.run(SKAction.sequence([SKAction.group([shrink, fade]), remove]))
+        }
+
+        placeChips[number] = nil
+    }
+
+    private func showBetChangeFeedback(on number: Int, amount: Int, decreased: Bool) {
+        guard let position = crapsTable?.getPointBoxPosition(number: number) else { return }
+
+        // Colors (WCAG compliant)
+        let color: SKColor = decreased ?
+            SKColor(red: 1.0, green: 0.8, blue: 0.2, alpha: 1.0) :  // Amber for decrease
+            SKColor(red: 0.4, green: 1.0, blue: 0.4, alpha: 1.0)    // Green for increase
+
+        // Direction indicator for color blindness
+        let indicator = decreased ? "v" : "^"
+        let amountText = decreased ? "-$\(abs(amount))" : "+$\(abs(amount))"
+
+        // Create feedback label
+        let label = SKLabelNode(text: "\(indicator) \(amountText)")
+        label.fontSize = 24
+        label.fontName = "Arial-BoldMT"
+        label.fontColor = color
+        label.position = CGPoint(x: position.x, y: position.y - 50)
+        label.zPosition = 200
+        crapsTable?.addChild(label)
+
+        let remove = SKAction.removeFromParent()
+
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            // Static display
+            let wait = SKAction.wait(forDuration: 0.8)
+            label.run(SKAction.sequence([wait, remove]))
+        } else {
+            // Animate: float in direction of change
+            let moveY: CGFloat = decreased ? -40 : 40
+            let move = SKAction.moveBy(x: 0, y: moveY, duration: 0.8)
+            let fade = SKAction.fadeOut(withDuration: 0.8)
+            label.run(SKAction.sequence([SKAction.group([move, fade]), remove]))
+        }
+
+        // Pulse the chip
+        if let chip = placeChips[number] {
+            pulseChip(chip, color: color)
+        }
+    }
+
+    private func pulseChip(_ chip: SKNode, color: SKColor) {
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+
+        // Create pulse overlay
+        let pulse = SKShapeNode(circleOfRadius: 22)
+        pulse.fillColor = .clear
+        pulse.strokeColor = color
+        pulse.lineWidth = 3
+        pulse.position = chip.position
+        pulse.zPosition = chip.zPosition + 1
+        crapsTable?.addChild(pulse)
+
+        let expand = SKAction.scale(to: 1.3, duration: 0.15)
+        let contract = SKAction.scale(to: 1.0, duration: 0.15)
+        let remove = SKAction.removeFromParent()
+        pulse.run(SKAction.sequence([expand, contract, remove]))
     }
 
     // MARK: - Accessibility Announcements
@@ -957,6 +1079,17 @@ class GameScene: SKScene {
         } else {
             announcement = "Lost \(betType) bet"
         }
+        NSAccessibility.post(element: self.view as Any, notification: .announcementRequested, userInfo: [.announcement: announcement])
+    }
+
+    private func announceBetChanged(number: Int, newAmount: Int, increased: Bool) {
+        let action = increased ? "Increased" : "Decreased"
+        let announcement = "\(action) Place \(number) to $\(newAmount)"
+        NSAccessibility.post(element: self.view as Any, notification: .announcementRequested, userInfo: [.announcement: announcement])
+    }
+
+    private func announceBetRemoved(number: Int) {
+        let announcement = "Place \(number) bet removed"
         NSAccessibility.post(element: self.view as Any, notification: .announcementRequested, userInfo: [.announcement: announcement])
     }
 
@@ -1193,7 +1326,7 @@ class GameScene: SKScene {
                            userInfo: [.announcement: "Game over. You're out of chips. Press Space or click New Game to start over."])
     }
 
-    private func startNewGame() {
+    func startNewGame() {
         // Remove game over UI
         childNode(withName: "gameOverOverlay")?.removeFromParent()
         childNode(withName: "gameOverContainer")?.removeFromParent()
@@ -1298,7 +1431,11 @@ class GameScene: SKScene {
             announcement = "Don't Pass bet area"
         case .point4, .point5, .point6, .point8, .point9, .point10:
             if let number = element.pointNumber {
-                announcement = "Place bet on \(number)"
+                if let currentBet = gameManager.player.getPlaceBetAmount(on: number) {
+                    announcement = "Place \(number), current bet $\(currentBet). Space to increase, Delete to decrease."
+                } else {
+                    announcement = "Place \(number), no bet. Space to place bet."
+                }
             } else {
                 announcement = "Point number"
             }
@@ -1349,6 +1486,10 @@ class GameScene: SKScene {
             if let window = view?.window, window.styleMask.contains(.fullScreen) {
                 window.toggleFullScreen(nil)
             }
+        case 51, 117:  // Delete, Forward Delete - decrease bet on focused place number
+            if let focus = currentFocus, let number = focus.pointNumber {
+                handlePlaceBetClick(on: number, isDecrease: true)
+            }
         default:
             super.keyDown(with: event)
         }
@@ -1384,8 +1525,18 @@ class GameScene: SKScene {
             actionable.append(.dontPass)
         }
 
-        // Point numbers: actionable during point phase (except current point)
+        // Point numbers and bet buttons: actionable during point phase
         if case .point(let currentPoint) = gameManager.state {
+            // Bet amount buttons: actionable if player can afford them
+            let bankroll = gameManager.player.bankroll
+            let amounts = [25, 50, 100, 500]
+            for amount in amounts {
+                if bankroll >= amount, let element = FocusableElement.fromBetAmount(amount) {
+                    actionable.append(element)
+                }
+            }
+
+            // Point numbers (except current point)
             let pointNumbers = [4, 5, 6, 8, 9, 10]
             for num in pointNumbers {
                 if num != currentPoint {

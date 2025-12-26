@@ -12,6 +12,7 @@ Build a learn-by-playing craps game for macOS. Start with clean architecture, ad
 - [x] **Phase 4: Audio** - Synthesized sounds for all game events
 - [x] **Phase 5: Polish** - HUD, bet UI, visual feedback, educational cues, Place bets
 - [x] **Phase 6: Testing & Accessibility** - Unit tests, VoiceOver, hearing accessibility, Reduce Motion
+- [x] **Phase 7: Variable Place Bets** - Increase/decrease place bets with full accessibility
 
 ## Phase Details
 
@@ -75,6 +76,15 @@ Plans:
 - [x] 06-05: State sync and hearing accessibility (visual feedback for audio)
 - [x] 06-06: Reduce Motion support and cleanup
 
+### Phase 7: Variable Place Bets
+**Goal**: Allow increasing/decreasing place bets per real craps rules with full accessibility
+**Depends on**: Phase 6
+**Plans**: 2 plans
+
+Plans:
+- [x] 07-01: Variable place bet amounts with accessibility support
+- [x] 07-02: Persistent bet amount selector (always visible for UI consistency)
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -85,15 +95,16 @@ Plans:
 | 4. Audio | 2/2 | Complete | 2025-12-24 |
 | 5. Polish | 3/3 | Complete | 2025-12-25 |
 | 6. Testing & Accessibility | 6/6 | Complete | 2025-12-25 |
+| 7. Variable Place Bets | 2/2 | Complete | 2025-12-25 |
 
 ## v1.0 Complete
 
 Casey Craps is a fully functional craps game with:
 - Pass Line and Don't Pass betting
 - Place bets on point numbers with correct odds
+- Variable place bet amounts (increase/decrease per real craps rules)
 - Synthesized audio feedback
 - Educational hints and roll result callouts
-- Take-down functionality for Place bets
 - Full accessibility support:
   - VoiceOver screen reader navigation
   - Full keyboard navigation with visual focus indicator
@@ -101,4 +112,4 @@ Casey Craps is a fully functional craps game with:
   - Reduce Motion preference support
   - Color blind friendly (shapes differentiate win/lose)
   - WCAG contrast ratio compliance
-- 99 unit tests covering game logic, models, and sound
+- 103 unit tests covering game logic, models, and sound

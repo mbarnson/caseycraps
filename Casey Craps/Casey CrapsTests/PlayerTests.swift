@@ -170,14 +170,62 @@ struct PlayerTests {
         #expect(player.bankroll == 700, "Bankroll should be reduced by 300")
     }
 
-    @Test func cannotPlaceDuplicatePlaceBet() {
+    @Test func canIncreasePlaceBet() {
         let player = Player(bankroll: 1000)
 
         #expect(player.placePlaceBet(number: 6, amount: 60) == true, "First bet succeeds")
-        #expect(player.placePlaceBet(number: 6, amount: 60) == false, "Duplicate bet fails")
+        #expect(player.placePlaceBet(number: 6, amount: 60) == true, "Second bet on same number increases it")
 
-        #expect(player.placeBets.count == 1, "Should have only one place bet")
-        #expect(player.bankroll == 940, "Only first bet deducted")
+        #expect(player.placeBets.count == 1, "Should have only one place bet entry")
+        #expect(player.getPlaceBetAmount(on: 6) == 120, "Bet amount should be doubled")
+        #expect(player.bankroll == 880, "Both bets deducted")
+    }
+
+    @Test func decreasePlaceBetPartially() {
+        let player = Player(bankroll: 1000)
+        player.placePlaceBet(number: 6, amount: 100)
+        #expect(player.bankroll == 900)
+
+        let result = player.decreasePlaceBet(number: 6, amount: 40)
+
+        #expect(result.success == true, "Decrease should succeed")
+        #expect(result.newAmount == 60, "Remaining bet should be 60")
+        #expect(player.bankroll == 940, "40 returned to bankroll")
+        #expect(player.hasPlaceBet(on: 6) == true, "Still has bet on 6")
+    }
+
+    @Test func decreasePlaceBetToZero() {
+        let player = Player(bankroll: 1000)
+        player.placePlaceBet(number: 6, amount: 100)
+
+        let result = player.decreasePlaceBet(number: 6, amount: 100)
+
+        #expect(result.success == true, "Decrease should succeed")
+        #expect(result.newAmount == 0, "Bet should be removed")
+        #expect(player.bankroll == 1000, "Full amount returned")
+        #expect(player.hasPlaceBet(on: 6) == false, "No longer has bet on 6")
+    }
+
+    @Test func decreasePlaceBetBeyondAmount() {
+        let player = Player(bankroll: 1000)
+        player.placePlaceBet(number: 6, amount: 50)
+
+        // Try to decrease by more than the bet amount
+        let result = player.decreasePlaceBet(number: 6, amount: 100)
+
+        #expect(result.success == true, "Decrease should succeed")
+        #expect(result.newAmount == 0, "Bet should be removed")
+        #expect(player.bankroll == 1000, "Original amount returned (not more)")
+    }
+
+    @Test func decreasePlaceBetNonExistent() {
+        let player = Player(bankroll: 1000)
+
+        let result = player.decreasePlaceBet(number: 6, amount: 50)
+
+        #expect(result.success == false, "Cannot decrease non-existent bet")
+        #expect(result.newAmount == 0)
+        #expect(player.bankroll == 1000, "Bankroll unchanged")
     }
 
     @Test func takeDownPlaceBetReturnsAmount() {

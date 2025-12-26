@@ -150,6 +150,32 @@ class SoundManager {
         playTone(frequency: frequency, duration: duration, volume: volume)
     }
 
+    /// Play bet increase sound - chip click followed by ascending confirmation tone
+    func playBetIncrease() {
+        guard isEnabled else { return }
+
+        // Chip click
+        playChipClick()
+
+        // Ascending confirmation tone
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
+            self?.playTone(frequency: 1200, duration: 0.06, volume: 0.25)
+        }
+    }
+
+    /// Play bet decrease sound - chip click followed by descending tone
+    func playBetDecrease() {
+        guard isEnabled else { return }
+
+        // Chip click
+        playChipClick()
+
+        // Descending tone
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
+            self?.playTone(frequency: 600, duration: 0.06, volume: 0.2)
+        }
+    }
+
     /// Play win sound - ascending happy tones
     func playWinSound() {
         guard isEnabled else { return }

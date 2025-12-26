@@ -63,7 +63,7 @@ class GameManager: ObservableObject {
 
     /// Check if a Place bet can be placed on a specific number
     /// - Parameter number: The number to bet on
-    /// - Returns: true if the bet can be placed
+    /// - Returns: true if the bet can be placed or increased
     func canPlaceBet(on number: Int) -> Bool {
         // Only during point phase
         guard case .point(let point) = state else { return false }
@@ -74,13 +74,8 @@ class GameManager: ObservableObject {
         // Must be a valid place number
         guard [4, 5, 6, 8, 9, 10].contains(number) else { return false }
 
-        // Cannot already have a bet on this number
-        let alreadyHasBet = player.placeBets.contains {
-            if case .place(let n) = $0.type { return n == number }
-            return false
-        }
-
-        return !alreadyHasBet
+        // Allowed to place new bet or increase existing bet
+        return true
     }
 
     /// Last Place bet winnings (for UI feedback)

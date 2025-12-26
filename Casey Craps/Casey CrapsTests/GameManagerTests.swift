@@ -518,7 +518,7 @@ struct GameManagerTests {
         #expect(gameManager.canPlaceBet(on: 12) == false, "Cannot place bet on 12")
     }
 
-    @Test func cannotPlaceDuplicatePlaceBet() {
+    @Test func canIncreasePlaceBetOnExistingNumber() {
         let (gameManager, player) = resetGame()
         player.placeBet(type: .pass, amount: 100)
         gameManager.placeBet()
@@ -529,9 +529,15 @@ struct GameManagerTests {
 
         // Place bet on 6
         #expect(player.placePlaceBet(number: 6, amount: 60))
+        #expect(player.bankroll == 840) // 1000 - 100 (pass) - 60 (place)
 
-        // Try to place another bet on 6
-        #expect(gameManager.canPlaceBet(on: 6) == false, "Cannot place duplicate bet on same number")
+        // canPlaceBet should return true for increasing existing bet
+        #expect(gameManager.canPlaceBet(on: 6) == true, "Can increase existing place bet")
+
+        // Increase bet on 6
+        #expect(player.placePlaceBet(number: 6, amount: 60))
+        #expect(player.getPlaceBetAmount(on: 6) == 120, "Bet should be increased to 120")
+        #expect(player.bankroll == 780)
     }
 
     // MARK: - Pass/Don't Pass Payout Tests

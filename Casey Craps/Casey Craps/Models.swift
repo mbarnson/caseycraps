@@ -96,23 +96,56 @@ class Player {
 
     // MARK: - Place Bets
 
-    /// Place a bet on a specific number (4, 5, 6, 8, 9, 10)
+    /// Place a bet on a specific number (4, 5, 6, 8, 9, 10), or increase an existing bet
     /// - Parameters:
     ///   - number: The number to bet on
-    ///   - amount: The amount to bet
-    /// - Returns: true if bet was placed successfully
+    ///   - amount: The amount to bet (or add to existing bet)
+    /// - Returns: true if bet was placed/increased successfully
     func placePlaceBet(number: Int, amount: Int) -> Bool {
         guard amount <= bankroll else { return false }
         guard [4, 5, 6, 8, 9, 10].contains(number) else { return false }
 
-        // Check if already have a bet on this number
-        if placeBets.contains(where: { if case .place(let n) = $0.type { return n == number } else { return false } }) {
+        // Check if already have a bet on this number - if so, increase it
+        if let index = placeBets.firstIndex(where: {
+            if case .place(let n) = $0.type { return n == number }
             return false
+        }) {
+            bankroll -= amount
+            placeBets[index].amount += amount
+            return true
         }
 
+        // Place new bet
         bankroll -= amount
         placeBets.append(Bet(type: .place(number), amount: amount))
         return true
+    }
+
+    /// Decrease a place bet by the specified amount
+    /// - Parameters:
+    ///   - number: The number to decrease bet on
+    ///   - amount: The amount to decrease by
+    /// - Returns: Tuple (success, newAmount) where newAmount is the remaining bet (0 if removed)
+    func decreasePlaceBet(number: Int, amount: Int) -> (success: Bool, newAmount: Int) {
+        guard let index = placeBets.firstIndex(where: {
+            if case .place(let n) = $0.type { return n == number }
+            return false
+        }) else {
+            return (false, 0)
+        }
+
+        let currentAmount = placeBets[index].amount
+        if amount >= currentAmount {
+            // Remove bet entirely
+            bankroll += currentAmount
+            placeBets.remove(at: index)
+            return (true, 0)
+        } else {
+            // Reduce bet
+            bankroll += amount
+            placeBets[index].amount -= amount
+            return (true, placeBets[index].amount)
+        }
     }
 
     /// Check if player has a place bet on a specific number
